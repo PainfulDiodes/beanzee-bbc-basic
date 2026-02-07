@@ -1,4 +1,4 @@
-	; TITLE	'(C) COPYRIGHT R.T.RUSSELL 1986-2025'
+	; TITLE '(C) COPYRIGHT R.T.RUSSELL 1986-2025'
 ;
 ;Z80 FLOATING POINT PACKAGE
 ;(C) COPYRIGHT  R.T.RUSSELL  1986-2024
@@ -24,17 +24,17 @@
 ;
 ;Error codes:
 ;
-BADOP	EQU	1		;Bad operation code
-DIVBY0	EQU	18		;Division by zero
+; BADOP EQU	1		;Bad operation code
+; DIVBY0 EQU	18		;Division by zero
 TOOBIG	EQU	20		;Too big
-NGROOT	EQU	21		;Negative root
-LOGRNG	EQU	22		;Log range
-ACLOST	EQU	23		;Accuracy lost
-EXPRNG	EQU	24		;Exp range
+; NGROOT EQU	21		;Negative root
+; LOGRNG EQU	22		;Log range
+; ACLOST EQU	23		;Accuracy lost
+; EXPRNG EQU	24		;Exp range
 ;
-	PUBLIC	FPP
-	EXTERN	STORE5
-	EXTERN	DLOAD5
+	; PUBLIC FPP
+	; EXTERN STORE5
+	; EXTERN DLOAD5
 ;
 ;Call entry and despatch code:
 ;
@@ -2252,4 +2252,4 @@ ABS2:	EX	AF,AF'
 	LD	HL,0
 	RET
 ;
-	END
+	; END

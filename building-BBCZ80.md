@@ -57,13 +57,22 @@ The CP/M assembler uses different directive names than z88dk:
 | `TITLE`        | N/A (comment out) | Module title for listings         |
 | `ASEG`         | N/A (remove)      | Absolute segment declaration      |
 
-The `convert-source.sh` script automates this conversion:
+The `convert-source.sh` script automates these conversions:
 
 ```bash
 ./convert-source.sh
 ```
 
-This copies files from `src/` to `asm/`, renaming from `.Z80` to `.asm` and applying the directive translations. The original source files are preserved.
+This copies files from `src/` to `asm/`, renaming from `.Z80` to `.asm` and applying:
+
+- Directive translations (GLOBAL, EXTRN, TITLE, ASEG)
+- Comment out ORG and END directives
+- Convert string quotes (single to double for DEFM)
+- Convert character expressions (`'X' AND 1FH` to numeric)
+- Comment out duplicate EQU definitions (centralised in `constants.inc`)
+- Comment out size-check conditionals (IF $ GT)
+
+The original source files are preserved unchanged.
 
 ## Build Approach
 
@@ -103,26 +112,28 @@ The DATA segment must start on a page boundary because ACCS (string accumulator)
 0x4C00 - 0x4DFF   DATA segment
 ```
 
-## Known Issues and Considerations
+## Known Issues and Limitations
+
+### Namespace Collisions
+
+The include-based approach combines all modules into a single namespace. The original codebase was designed for modular compilation where each module had its own namespace. This causes:
+
+- **Duplicate labels**: Labels like `COLD`, `ERROR0`-`ERROR4`, `CLS`, `CMDTAB` are defined in multiple modules with different implementations
+- **Duplicate EQU constants**: Handled by `constants.inc`, but some constants conflict with labels (e.g., `BDOS`, `DEL`, `TOOBIG`)
+
+These require manual renaming in the source files to resolve.
+
+### Remaining Manual Fixes
+
+After running `convert-source.sh`, the following issues remain:
+
+1. **Duplicate code labels** - Rename conflicting labels across modules
+2. **Quote escaping** - Strings containing quote characters (e.g., `Can't match`)
+3. **Character expressions** - Some `'X' AND mask` patterns not yet converted
 
 ### DATA Segment Placement
 
-The original build places DATA at a specific address using the linker's `/p:` directive. In the include-based approach, we use an inline `ORG 0x4B00` directive. This works but:
-
-- Creates a gap in the binary if code doesn't reach 0x4B00
-- May need adjustment if code size changes significantly
-
-### ORG Directives in Modules
-
-Some modules contain their own ORG directives (e.g., DIST.Z80 has `ORG 100H` and `ORG 1F0H`). These work correctly in the include-based approach.
-
-### END Directives
-
-Each module ends with an `END` directive. In z88dk with includes, these should be removed or the assembler may stop processing prematurely. The translation script doesn't handle this automatically.
-
-### Conditional Assembly
-
-The source uses `IF`/`ENDIF` for conditional assembly (e.g., checking code size limits). z88dk supports these but syntax may differ slightly. Manual review recommended.
+The original build places DATA at a specific address using the linker's `/p:` directive. In the include-based approach, we use an inline `ORG 0x4B00` directive. This creates a gap in the binary if code doesn't reach that address.
 
 ## Testing the Build
 
@@ -133,9 +144,19 @@ After building, verify the output:
 3. Compare with original pre-built binaries in `repo/bin/` directory
 4. Test on emulator (e.g., RunCPM, MAME CP/M)
 
+## Current Status
+
+The automated conversion handles most directive translations, but the build does not yet complete due to namespace collisions. Approximately 200 errors remain, primarily duplicate label definitions.
+
+Options to proceed:
+
+1. **Manual label renaming** - Rename duplicate labels in source files (significant effort)
+2. **Modular build** - Use the linker-based approach in [alternative-build-approach.md](alternative-build-approach.md)
+3. **Different assembler** - Some assemblers support module namespaces
+
 ## Future Improvements
 
-- Create proper makefile with dependency tracking
+- Resolve remaining namespace collisions
 - Add size comparison reporting
 - Automate testing against reference binaries
 - Consider creating a BeanZee target configuration

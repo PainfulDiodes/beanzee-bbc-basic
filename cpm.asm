@@ -17,6 +17,9 @@ ENDIF
 CPM_TARGET  EQU 1
 ACORN_TARGET EQU 0
 
+; Shared constants (must be included before modules)
+include "asm/constants.inc"
+
 ; Include modules in link order from original MAKE.SUB:
 ; link bbcbasic=dist,main,exec,eval,asmb,math,hook,cmos,/p:4B00,data
 
