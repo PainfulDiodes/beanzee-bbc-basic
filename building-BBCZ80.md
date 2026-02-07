@@ -119,7 +119,6 @@ After building, verify the output:
 1. Check binary size matches expectations (~18-20KB for code)
 2. Verify entry point at 0x0100 using hexdump
 3. Compare with original pre-built binaries in `bin/` directory
-4. Test on emulator (e.g., RunCPM, MAME CP/M)
 
 ## Current Status
 
