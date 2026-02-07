@@ -1,0 +1,1119 @@
+	; TITLE	BBC BASIC (C) R.T.RUSSELL 1984-2024
+;
+;PATCH FOR BBC BASIC TO CP/M 2.2 & 3.0
+;* ACORN COMPUTERS Z80 TUBE VERSION  *
+;(C) COPYRIGHT R.T.RUSSELL, 08-05-1984
+;VERSION 5.0, 14-06-2024
+;
+	PUBLIC	OSINIT
+	PUBLIC	OSRDCH
+	PUBLIC	OSWRCH
+	PUBLIC	OSLINE
+	PUBLIC	OSSAVE
+	PUBLIC	OSLOAD
+	PUBLIC	OSOPEN
+	PUBLIC	OSSHUT
+	PUBLIC	OSBGET
+	PUBLIC	OSBPUT
+	PUBLIC	OSSTAT
+	PUBLIC	GETEXT
+	PUBLIC	GETPTR
+	PUBLIC	PUTPTR
+	PUBLIC	PROMPT
+	PUBLIC	RESET
+	PUBLIC	LTRAP
+	PUBLIC	OSCLI
+	PUBLIC	TRAP
+	PUBLIC	BYE
+	PUBLIC	SCRAP
+;
+	EXTERN	ESCAPE
+	EXTERN	EXTERR
+	EXTERN	CHECK
+	EXTERN	CRLF
+;
+	EXTERN	ACCS
+	EXTERN	FREE
+	EXTERN	CURLIN
+	EXTERN	USER
+	EXTERN	VERMSG
+;
+;OSSAVE - Save an area of memory to a file.
+;   Inputs: HL addresses filename (term CR)
+;           DE = start address of data to save
+;           BC = length of data to save (bytes)
+; Destroys: A,B,C,D,E,H,L,F
+;
+STSAVE:	CALL	SAVLOD		;*SAVE
+	JP	C,HUH		;"Bad command"
+	PUSH	HL
+	JR	OSS1
+;
+OSSAVE:	PUSH	BC		;SAVE
+	CALL	SETUP0
+OSS1:	EX	DE,HL
+	CALL	CREATE
+	JR	NZ,SAVE
+	LD	A,190
+	CALL	EXTERR
+	DEFM	'Directory full'
+	DEFB	0
+SAVE:	CALL	WRITE
+	ADD	HL,BC
+	EX	(SP),HL
+	SBC	HL,BC
+	EX	(SP),HL
+	JR	Z,SAVE1
+	JR	NC,SAVE
+SAVE1:	POP	BC
+CLOSE:	LD	A,16
+	CALL	BDOS1
+	INC	A
+	RET	NZ
+	LD	A,200
+	CALL	EXTERR
+	DEFM	'Close error'
+	DEFB	0
+;
+;OSSHUT - Close disk file(s).
+;   Inputs: E = file channel
+;           If E=0 all files are closed
+; Destroys: A,B,C,D,E,H,L,F
+;
+OSSHUT:	LD	A,E
+	OR	A
+	JR	NZ,SHUTIT
+SHUT0:	INC	E
+	BIT	3,E
+	RET	NZ
+	PUSH	DE
+	CALL	SHUT1
+	POP	DE
+	JR	SHUT0
+;
+SHUTIT:	CALL	FIND1
+	JR	NZ,SHUT2
+	JP	CHANER
+;
+SHUT1:	CALL	FIND1
+	RET	Z
+SHUT2:	XOR	A
+	LD	(HL),A
+	DEC	HL
+	LD	(HL),A
+	LD	HL,37
+	ADD	HL,DE
+	BIT	7,(HL)
+	INC	HL
+	CALL	NZ,WRITE
+	LD	HL,FCBSIZ
+	ADD	HL,DE
+	LD	BC,(FREE)
+	SBC	HL,BC
+	JR	NZ,CLOSE
+	LD	(FREE),DE	;RELEASE SPACE
+	JR	CLOSE
+;
+;TYPE - *TYPE command.
+;Types file to console output.
+;
+TYPE:	SCF			;*TYPE
+	CALL	OSOPEN
+	OR	A
+	JR	Z,NOTFND
+	LD	E,A
+TYPE1:	CALL	TRAP		;IMPORTANT (ACORN)
+	CALL	OSBGET
+	CALL	OSWRCH
+	JR	NC,TYPE1
+	JR	OSSHUT
+;
+;OSLOAD - Load an area of memory from a file.
+;   Inputs: HL addresses filename (term CR)
+;           DE = address at which to load
+;           BC = maximum allowed size (bytes)
+;  Outputs: Carry reset indicates no room for file.
+; Destroys: A,B,C,D,E,H,L,F
+;
+STLOAD:	CALL	SAVLOD		;*LOAD
+	PUSH	HL
+	JR	OSL1
+;
+OSLOAD:	PUSH	BC		;LOAD
+	CALL	SETUP0
+OSL1:	EX	DE,HL
+	CALL	OPEN
+	JR	NZ,LOAD0
+NOTFND:	LD	A,214
+	CALL	EXTERR
+	DEFM	'File not found'
+	DEFB	0
+LOAD:	CALL	READ
+	JR	NZ,LOAD1
+	CALL	INCSEC
+	ADD	HL,BC
+LOAD0:	EX	(SP),HL
+	SBC	HL,BC
+	EX	(SP),HL
+	JR	NC,LOAD
+LOAD1:	POP	BC
+	PUSH	AF
+	CALL	CLOSE
+	POP	AF
+	CCF
+RESET:	RET
+;
+;OSOPEN - Open a file for reading or writing.
+;   Inputs: HL addresses filename (term CR)
+;           Carry set for OPENIN, cleared for OPENOUT.
+;  Outputs: A = file channel (=0 if cannot open)
+; Destroys: A,B,C,D,E,H,L,F
+;
+OSOPEN:	PUSH	AF		;SAVE CARRY
+	CALL	SETUP0
+	POP	AF
+	CALL	NC,CREATE
+	CALL	C,OPEN
+	RET	Z		;ERROR
+	LD	B,7		;MAX. NUMBER OF FILES
+	LD	HL,TABLE+13
+OPEN1:	LD	A,(HL)
+	DEC	HL
+	OR	(HL)
+	JR	Z,OPEN2
+	DEC	HL
+	DJNZ	OPEN1
+	LD	A,192
+	CALL	EXTERR
+	DEFM	'Too many open files'
+	DEFB	0
+;
+OPEN2:	LD	DE,(FREE)	;FREE SPACE POINTER
+	LD	(HL),E
+	INC	HL
+	LD	(HL),D
+	LD	A,B		;CHANNEL (1-7)
+	LD	HL,FCBSIZ
+	ADD	HL,DE		;RESERVE SPACE
+	LD	(FREE),HL
+	LD	HL,FCB
+	PUSH	DE
+	LD	BC,36
+	LDIR			;COPY FCB
+	EX	DE,HL
+	INC	HL
+	LD	(HL),C		;CLEAR PTR
+	INC	HL
+	POP	DE
+	LD	B,A
+	CALL	RDF		;READ OR FILL
+	LD	A,B
+	JP	CHECK
+;
+;OSBPUT - Write a byte to a random disk file.
+;   Inputs: E = file channel
+;           A = byte to write
+; Destroys: A,B,C,F
+;
+OSBPUT:	PUSH	DE
+	PUSH	HL
+	LD	B,A
+	CALL	FIND
+	LD	A,B
+	LD	B,0
+	DEC	HL
+	LD	(HL),B		;CLEAR EOF
+	INC	HL
+	LD	C,(HL)
+	RES	7,C
+	SET	7,(HL)
+	INC	(HL)
+	INC	HL
+	PUSH	HL
+	ADD	HL,BC
+	LD	(HL),A
+	POP	HL
+	CALL	Z,WRRDF		;WRITE THEN READ/FILL
+	POP	HL
+	POP	DE
+	RET
+;
+;OSBGET - Read a byte from a random disk file.
+;   Inputs: E = file channel
+;  Outputs: A = byte read
+;           Carry set if LAST BYTE of file
+; Destroys: A,B,C,F
+;
+OSBGET:	PUSH	DE
+	PUSH	HL
+	CALL	FIND
+	LD	C,(HL)
+	RES	7,C
+	INC	(HL)
+	INC	HL
+	PUSH	HL
+	LD	B,0
+	ADD	HL,BC
+	LD	B,(HL)
+	POP	HL
+	CALL	PE,INCRDF	;INC SECTOR THEN READ
+	CALL	Z,WRRDF		;WRITE THEN READ/FILL
+	LD	A,B
+	POP	HL
+	POP	DE
+	RET
+;
+;OSSTAT - Read file status.
+;   Inputs: E = file channel
+;  Outputs: Z flag set - EOF
+;           (If Z then A=0)
+;           DE = address of file block.
+; Destroys: A,D,E,H,L,F
+;
+OSSTAT:	CALL	FIND
+	DEC	HL
+	LD	A,(HL)
+	INC	A
+	RET
+;
+;GETEXT - Find file size.
+;   Inputs: E = file channel
+;  Outputs: DEHL = file size (0-&800000)
+; Destroys: A,B,C,D,E,H,L,F
+;
+GETEXT:	CALL	FIND
+	EX	DE,HL
+	LD	DE,FCB
+	LD	BC,36
+	PUSH	DE
+	LDIR			;COPY FCB
+	EX	DE,HL
+	EX	(SP),HL
+	EX	DE,HL
+	LD	A,35
+	CALL	BDOS1		;COMPUTE SIZE
+	POP	HL
+	XOR	A
+	JR	GETPT1
+;
+;GETPTR - Return file pointer.
+;   Inputs: E = file channel
+;  Outputs: DEHL = pointer (0-&7FFFFF)
+; Destroys: A,B,C,D,E,H,L,F
+;
+GETPTR:	CALL	FIND
+	LD	A,(HL)
+	ADD	A,A
+	DEC	HL
+GETPT1:	DEC	HL
+	LD	D,(HL)
+	DEC	HL
+	LD	E,(HL)
+	DEC	HL
+	LD	H,(HL)
+	LD	L,A
+	SRL	D
+	RR	E
+	RR	H
+	RR	L
+	RET
+;
+;PUTPTR - Update file pointer.
+;   Inputs: A = file channel
+;           DEHL = new pointer (0-&7FFFFF)
+; Destroys: A,B,C,D,E,H,L,F
+;
+PUTPTR:	LD	D,L
+	ADD	HL,HL
+	RL	E
+	LD	B,E
+	LD	C,H
+	LD	E,A		;CHANNEL
+	PUSH	DE
+	CALL	FIND
+	POP	AF
+	AND	7FH
+	BIT	7,(HL)		;PENDING WRITE?
+	JR	Z,PUTPT1
+	OR	80H
+PUTPT1:	LD	(HL),A
+	PUSH	DE
+	PUSH	HL
+	DEC	HL
+	DEC	HL
+	DEC	HL
+	LD	D,(HL)
+	DEC	HL
+	LD	E,(HL)
+	EX	DE,HL
+	OR	A
+	SBC	HL,BC
+	POP	HL
+	POP	DE
+	RET	Z
+	INC	HL
+	OR	A
+	CALL	M,WRITE
+	PUSH	HL
+	DEC	HL
+	DEC	HL
+	DEC	HL
+	LD	(HL),0
+	DEC	HL
+	LD	(HL),B
+	DEC	HL
+	LD	(HL),C		;NEW RECORD NO.
+	POP	HL
+	JR	RDF
+;
+;WRRDF - Write, read; if EOF fill with zeroes.
+;RDF - Read; if EOF fill with zeroes.
+;   Inputs: DE address FCB.
+;           HL addresses data buffer.
+;  Outputs: A=0, Z-flag set.
+;           Carry set if fill done (EOF)
+; Destroys: A,H,L,F
+;
+WRRDF:	CALL	WRITE
+RDF:	CALL	READ
+	DEC	HL
+	RES	7,(HL)
+	DEC	HL
+	LD	(HL),A		;CLEAR EOF FLAG
+	RET	Z
+	LD	(HL),-1		;SET EOF FLAG
+	INC	HL
+	INC	HL
+	PUSH	BC
+	XOR	A
+	LD	B,128
+FILL:	LD	(HL),A
+	INC	HL
+	DJNZ	FILL
+	POP	BC
+	SCF
+	RET
+;
+;INCRDF - Increment record, read; if EOF fill.
+;   Inputs: DE addresses FCB.
+;           HL addresses data buffer.
+;  Outputs: A=1, Z-flag reset.
+;           Carry set if fill done (EOF)
+; Destroys: A,H,L,F
+;
+INCRDF:	CALL	INCSEC
+	CALL	RDF
+	INC	A
+	RET
+;
+;READ - Read a record from a disk file.
+;   Inputs: DE addresses FCB.
+;           HL = address to store data.
+;  Outputs: A<>0 & Z-flag reset indicates EOF.
+;           Carry = 0
+; Destroys: A,F
+;
+;BDOS1 - CP/M BDOS call.
+;   Inputs: A = function number
+;          DE = parameter
+;  Outputs: AF = result (carry=0)
+; Destroys: A,F
+;
+READ:	CALL	SETDMA
+	LD	A,33
+BDOS1:	CALL	BDOS0
+	JR	NZ,CPMERR
+	OR	A
+	RET
+CPMERR:	LD	A,255
+	CALL	EXTERR
+	DEFM	'CP/M Error'
+	DEFB	0
+;
+BDOS0:	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	PUSH	IX
+	PUSH	IY
+	LD	C,A
+	CALL	BDOS
+	INC	H
+	DEC	H
+	POP	IY
+	POP	IX
+	POP	HL
+	POP	DE
+	POP	BC
+	RET
+;
+;WRITE - Write a record to a disk file.
+;   Inputs: DE addresses FCB.
+;           HL = address to get data.
+; Destroys: A,F
+;
+WRITE:	CALL	SETDMA
+	LD	A,40
+	CALL	BDOS1
+	JR	Z,INCSEC
+	LD	A,198
+	CALL	EXTERR
+	DEFM	'Disk full'
+	DEFB	0
+;
+;INCSEC - Increment random record number.
+;   Inputs: DE addresses FCB.
+; Destroys: F
+;
+INCSEC:	PUSH	HL
+	LD	HL,33
+	ADD	HL,DE
+INCS1:	INC	(HL)
+	INC	HL
+	JR	Z,INCS1
+	POP	HL
+	RET
+;
+;OPEN - Open a file for access.
+;   Inputs: FCB set up.
+;  Outputs: DE = FCB
+;           A=0 & Z-flag set indicates Not Found.
+;           Carry = 0
+; Destroys: A,D,E,F
+;
+OPEN:	LD	DE,FCB
+	LD	A,15
+	CALL	BDOS1
+	INC	A
+	RET
+;
+;CREATE - Create a disk file for writing.
+;   Inputs: FCB set up.
+;  Outputs: DE = FCB
+;           A=0 & Z-flag set indicates directory full.
+;           Carry = 0
+; Destroys: A,D,E,F
+;
+CREATE:	CALL	CHKAMB
+	LD	DE,FCB
+	LD	A,19
+	CALL	BDOS1		;DELETE
+	LD	A,22
+	CALL	BDOS1		;MAKE
+	INC	A
+	RET
+;
+;CHKAMB - Check for ambiguous filename.
+; Destroys: A,D,E,F
+;
+CHKAMB:	PUSH	BC
+	LD	DE,FCB
+	LD	B,12
+CHKAM1:	LD	A,(DE)
+	CP	'?'
+	JR	Z,AMBIG		;AMBIGUOUS
+	INC	DE
+	DJNZ	CHKAM1
+	POP	BC
+	RET
+AMBIG:	LD	A,204
+	CALL	EXTERR
+	DEFM	'Bad name'
+	DEFB	0
+;
+;SETDMA - Set "DMA" address.
+;   Inputs: HL = address
+; Destroys: A,F
+;
+SETDMA:	LD	A,26
+	EX	DE,HL
+	CALL	BDOS0
+	EX	DE,HL
+	RET
+;
+;FIND - Find file parameters from channel.
+;   Inputs: E = channel
+;  Outputs: DE addresses FCB
+;           HL addresses pointer byte (FCB+37)
+; Destroys: A,D,E,H,L,F
+;
+FIND:	INC	E
+	DEC	E
+	JR	Z,CHANER
+	CALL	FIND1
+	LD	HL,37
+	ADD	HL,DE
+	RET	NZ
+CHANER:	LD	A,222
+	CALL	EXTERR
+	DEFM	'Invalid channel'
+	DEFB	0
+;
+;FIND1 - Look up file table.
+;   Inputs: E = channel
+;  Outputs: Z-flag set = file not opened
+;           If NZ, DE addresses FCB
+;                  HL points into table
+; Destroys: A,D,E,H,L,F
+;
+FIND1:	LD	A,E
+	AND	7
+	ADD	A,A
+	LD	E,A
+	LD	D,0
+	LD	HL,TABLE-2
+	ADD	HL,DE
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	LD	A,D
+	OR	E
+	RET
+;
+;SETUP - Set up File Control Block.
+;   Inputs: HL addresses filename
+;           Format  [A:]FILENAME[.EXT]
+;           Device defaults to current drive
+;           Extension defaults to .BBC
+;           A = fill character
+;  Outputs: HL updated
+;           A = terminator
+;           BC = 128
+; Destroys: A,B,C,H,L,F
+;
+;FCB FORMAT (36 BYTES TOTAL):
+; 0      0=SAME DISK, 1=DISK A, 2=DISK B (ETC.)
+; 1-8    FILENAME, PADDED WITH SPACES
+; 9-11   EXTENSION, PADDED WITH SPACES
+; 12     CURRENT EXTENT, SET TO ZERO
+; 32-35  CLEARED TO ZERO
+;
+SETUP0:	LD	A,' '
+SETUP:	PUSH	DE
+	PUSH	HL
+	LD	DE,FCB+9
+	LD	HL,BBC
+	LD	BC,3
+	LDIR
+	LD	HL,FCB+32
+	LD	B,4
+SETUP1:	LD	(HL),C
+	INC	HL
+	DJNZ	SETUP1
+	POP	HL
+	LD	C,A
+	XOR	A
+	LD	(DE),A
+	POP	DE
+	CALL	SKIPSP
+	CP	'"'
+	JR	NZ,SETUP2
+	INC	HL
+	CALL	SKIPSP
+	CALL	SETUP2
+	CP	'"'
+	INC	HL
+	JR	Z,SKIPSP
+BADSTR:	LD	A,253
+	CALL	EXTERR
+	DEFM	'Bad string'
+	DEFB	0
+;
+PARSE:	LD	A,(HL)
+	INC	HL
+	CP	'`'
+	RET	NC
+	CP	'?'
+	RET	C
+	XOR	40H
+	RET
+;
+SETUP2:	PUSH	DE
+	INC	HL
+	LD	A,(HL)
+	CP	':'
+	DEC	HL
+	LD	A,B
+	JR	NZ,DEVICE
+	LD	A,(HL)		;DRIVE
+	AND	31
+	INC	HL
+	INC	HL
+DEVICE:	LD	DE,FCB
+	LD	(DE),A
+	INC	DE
+	LD	B,8
+COPYF:	LD	A,(HL)
+	CP	'.'
+	JR	Z,COPYF1
+	CP	' '
+	JR	Z,COPYF1
+	CP	CR
+	JR	Z,COPYF1
+	CP	'='
+	JR	Z,COPYF1
+	CP	'"'
+	JR	Z,COPYF1
+	LD	C,'?'
+	CP	'*'
+	JR	Z,COPYF1
+	LD	C,' '
+	INC	HL
+	CP	'|'
+	JR	NZ,COPYF2
+	CALL	PARSE
+	JR	COPYF0
+COPYF1:	LD	A,C
+COPYF2:	CALL	UPPRC
+COPYF0:	LD	(DE),A
+	INC	DE
+	DJNZ	COPYF
+COPYF3:	LD	A,(HL)
+	INC	HL
+	CP	'*'
+	JR	Z,COPYF3
+	CP	'.'
+	LD	BC,3*256+' '
+	LD	DE,FCB+9
+	JR	Z,COPYF
+	DEC	HL
+	POP	DE
+	LD	BC,128
+SKIPSP:	LD	A,(HL)
+	CP	' '
+	RET	NZ
+	INC	HL
+	JR	SKIPSP
+;
+BBC:	DEFM	'BBC'
+;
+;HEX - Read a hex string and convert to binary.
+;   Inputs: HL = text pointer
+;  Outputs: HL = updated text pointer
+;           DE = value
+;            A = terminator (spaces skipped)
+; Destroys: A,D,E,H,L,F
+;
+HEX:	LD	DE,0		;INITIALISE
+	CALL	SKIPSP
+HEX1:	LD	A,(HL)
+	CALL	UPPRC
+	CP	'0'
+	JR	C,SKIPSP
+	CP	'9'+1
+	JR	C,HEX2
+	CP	'A'
+	JR	C,SKIPSP
+	CP	'F'+1
+	JR	NC,SKIPSP
+	SUB	7
+HEX2:	AND	0FH
+	EX	DE,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	EX	DE,HL
+	OR	E
+	LD	E,A
+	INC	HL
+	JR	HEX1
+;
+;OSCLI - Process an "operating system" command
+;
+OSCLI:	CALL	SKIPSP
+	CP	CR
+	RET	Z
+	CP	'|'
+	RET	Z
+	CP	'.'
+	JP	Z,DOT		;*.
+	EX	DE,HL
+	LD	HL,COMDS
+OSCLI0:	LD	A,(DE)
+	CALL	UPPRC
+	CP	(HL)
+	JR	Z,OSCLI2
+	JR	C,UNK
+OSCLI1:	BIT	7,(HL)
+	INC	HL
+	JR	Z,OSCLI1
+	INC	HL
+	INC	HL
+	JR	OSCLI0
+;
+OSCLI2:	PUSH	DE
+OSCLI3:	INC	DE
+	INC	HL
+	LD	A,(DE)
+	CALL	UPPRC
+	CP	'.'		;ABBREVIATED?
+	JR	Z,OSCLI4
+	XOR	(HL)
+	JR	Z,OSCLI3
+	CP	80H
+	JR	Z,OSCLI4
+	POP	DE
+	JR	OSCLI1
+;
+OSCLI4:	POP	AF
+	INC	DE
+OSCLI5:	BIT	7,(HL)
+	INC	HL
+	JR	Z,OSCLI5
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	PUSH	HL
+	EX	DE,HL
+	JP	SKIPSP
+;
+UNK:	EX	DE,HL
+	JP	ASCLI
+;
+;
+BYE:	RST	0		;*BYE, *QUIT
+;
+ERA:	CALL	SETUP0		;*ERA, *ERASE
+	LD	C,19
+	JR	XEQ		;"DELETE"
+;
+RES:	LD	C,13		;*RESET
+	JR	XEQ		;"RESET"
+;
+DRV:	CALL	SETUP0		;*DRIVE
+	LD	A,(FCB)
+	DEC	A
+	JP	M,HUH
+	LD	E,A
+	LD	C,14
+	JR	XEQ0
+;
+REN:	CALL	SETUP0		;*REN, *RENAME
+	CP	'='
+	JR	NZ,HUH
+	INC	HL
+	PUSH	HL
+	CALL	EXISTS
+	LD	HL,FCB
+	LD	DE,FCB+16
+	LD	BC,12
+	LDIR
+	POP	HL
+	CALL	SETUP0
+	CALL	CHKAMB
+	LD	C,23
+XEQ:	LD	DE,FCB
+XEQ0:	LD	A,(HL)
+	CP	CR
+	JR	NZ,HUH
+BDC:	LD	A,C
+	CALL	BDOS1
+	RET	P
+HUH:	LD	A,254
+	CALL	EXTERR
+	DEFM	'Bad command'
+	DEFB	0
+;
+EXISTS:	LD	HL,DSKBUF
+	CALL	SETDMA
+	LD	DE,FCB
+	LD	A,17
+	CALL	BDOS1		;SEARCH
+	INC	A
+	RET	Z
+	LD	A,196
+	CALL	EXTERR
+	DEFM	'File exists'
+	DEFB	0
+;
+SAVLOD:	CALL	SETUP0		;PART OF *SAVE, *LOAD
+	CALL	HEX
+	CP	'+'
+	PUSH	AF
+	PUSH	DE
+	JR	NZ,SAVLO1
+	INC	HL
+SAVLO1:	CALL	HEX
+	CP	CR
+	JR	NZ,HUH
+	EX	DE,HL
+	POP	DE
+	POP	AF
+	RET	Z
+	OR	A
+	SBC	HL,DE
+	RET	NZ
+	JR	HUH
+;
+DOT:	INC	HL
+DIR:	LD	A,'?'		;*DIR
+	CALL	SETUP
+	CP	CR
+	JR	NZ,HUH
+	LD	C,17
+DIR0:	LD	B,4
+DIR1:	CALL	LTRAP
+	LD	DE,FCB
+	LD	HL,DSKBUF
+	CALL	SETDMA
+	LD	A,C
+	CALL	BDOS1		;SEARCH DIRECTORY
+	JP	M,CRLF
+	RRCA
+	RRCA
+	RRCA
+	AND	60H
+	LD	E,A
+	LD	D,0
+	LD	HL,DSKBUF+1
+	ADD	HL,DE
+	PUSH	HL
+	LD	DE,8
+	ADD	HL,DE
+	LD	E,(HL)
+	INC	HL
+	BIT	7,(HL)		;SYSTEM FILE?
+	POP	HL
+	LD	C,18
+	JR	NZ,DIR1
+	PUSH	BC
+	LD	A,B
+	CP	4
+	LD	A,' '
+	CALL	Z,DRIVE
+	CALL	OSWRCH
+	LD	B,8
+	LD	A,' '
+	BIT	7,E		;READ ONLY?
+	JR	Z,DIR3
+	LD	A,'*'
+DIR3:	CALL	CPTEXT
+	LD	B,3
+	LD	A,' '
+	CALL	SPTEXT
+	POP	BC
+	DJNZ	DIR1
+	CALL	CRLF
+	JR	DIR0
+;
+DRIVE:	LD	A,(FCB)
+	DEC	A
+	LD	C,25
+	CALL	M,BDC
+	ADD	A,'A'
+	RET
+;
+UPPRC:	AND	7FH
+	CP	'`'
+	RET	C
+	AND	5FH		;CONVERT TO UPPER CASE
+	RET
+;
+HELP:	LD	B,32		;*HELP
+	LD	HL,VERMSG
+	JP	PTEXT
+;
+;
+COMDS:	DEFM	'BY'
+	DEFB	'E'+80H
+	DEFW	BYE
+	DEFM	'CP'
+	DEFB	'M'+80H
+	DEFW	BYE
+	DEFM	'DI'
+	DEFB	'R'+80H
+	DEFW	DIR
+	DEFM	'DRIV'
+	DEFB	'E'+80H
+	DEFW	DRV
+	DEFM	'ERAS'
+	DEFB	'E'+80H
+	DEFW	ERA
+	DEFM	'ER'
+	DEFB	'A'+80H
+	DEFW	ERA
+	DEFM	'HEL'
+	DEFB	'P'+80H
+	DEFW	HELP
+	DEFM	'LOA'
+	DEFB	'D'+80H
+	DEFW	STLOAD
+	DEFM	'QUI'
+	DEFB	'T'+80H
+	DEFW	BYE
+	DEFM	'RENAM'
+	DEFB	'E'+80H
+	DEFW	REN
+	DEFM	'RE'
+	DEFB	'N'+80H
+	DEFW	REN
+	DEFM	'RESE'
+	DEFB	'T'+80H
+	DEFW	RES
+	DEFM	'SAV'
+	DEFB	'E'+80H
+	DEFW	STSAVE
+	DEFM	'TYP'
+	DEFB	'E'+80H
+	DEFW	TYPE
+	DEFB	0FFH
+;
+;PROCESS 6502's BRK INSTRUCTION
+;
+BRK:	LD	HL,(BRKPTR)
+	PUSH	HL
+BRKTRP:	POP	HL
+	LD	A,(HL)
+	INC	HL
+	PUSH	HL
+	JP	EXTERR
+;
+;TRAP - Test for "ESC" and abort if so.
+;  Destroys: A,H,L,F
+;
+TRAP:
+LTRAP:	LD	A,(BRKFLG)
+	OR	A
+	RET	P
+ESC:	LD	A,126
+	CALL	ASBYTE
+	JP	ESCAPE
+;
+;PTEXT - Print text
+;   Inputs: HL = address of text
+;            B = number of characters to print
+; Destroys: A,B,H,L,F
+;
+CPTEXT:	PUSH	AF
+	LD	A,':'
+	CALL	OSWRCH
+	POP	AF
+SPTEXT:	CALL	OSWRCH
+PTEXT:	LD	A,(HL)
+	AND	7FH
+	INC	HL
+	CALL	OSWRCH
+	DJNZ	PTEXT
+	RET
+;
+;OSINIT - Initialise RAM mapping etc.
+;If BASIC is entered by BBCBASIC FILENAME then file
+;FILENAME.BBC is automatically CHAINed.
+;   Outputs: DE = initial value of HIMEM (top of RAM)
+;            HL = initial value of PAGE (user program)
+;            Z-flag reset indicates AUTO-RUN.
+;  Destroys: A,B,C,D,E,H,L,F
+;
+OSINIT:	LD	A,0C3H
+	LD	(38H),A
+	LD	HL,BRKTRP
+	LD	(39H),HL
+	LD	HL,BRK
+	LD	(BRKVEC),HL
+	LD	A,229
+	LD	HL,0
+	CALL	ASBYTE		;ESC interrupts program
+	LD	A,230
+	LD	HL,0
+	CALL	ASBYTE		;ESC flushes buffers
+	LD	C,45
+	LD	E,254
+	CALL	BDOS		;TRAP ERRORS (CP/M 3)
+	XOR	A
+	LD	B,INILEN
+	LD	HL,TABLE
+CLRTAB:	LD	(HL),A		;CLEAR FILE TABLE
+	INC	HL
+	DJNZ	CLRTAB
+	LD	DE,ACCS
+	LD	HL,DSKBUF
+	LD	C,(HL)
+	INC	HL
+	CP	C
+	JR	Z,NOBOOT
+	LDIR			;COPY TO ACCS
+NOBOOT:	EX	DE,HL
+	LD	(HL),CR
+	LD	DE,(6)		;DE = HIMEM
+	LD	E,A		;PAGE BOUNDARY
+	LD	HL,USER
+	RET
+;
+;OSRDCH - Read a character from console input.
+;  Outputs: A = character.
+; Destroys: A,F
+;
+OSRDCH:	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	CALL	ASRDCH
+	POP	HL
+	POP	DE
+	POP	BC
+	RET
+;
+;OSWRCH - Write a character to console output.
+;   Inputs: A = character.
+; Destroys: Nothing
+;
+PROMPT:	LD	A,'>'
+OSWRCH:	PUSH	AF
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	CALL	ASWRCH
+	POP	HL
+	POP	DE
+	POP	BC
+	POP	AF
+	RET
+;
+;OSLINE - Read a complete line, terminated by 
+;carriage-return.
+;   Inputs: HL addresses destination buffer.
+;           (L=0)
+;  Outputs: Buffer filled, terminated by CR.
+;           A=0.
+;  Destroys: A,B,C,D,E,H,L,IX,F
+;
+OSLINE:	LD	IX,SCRAP
+	LD	(IX+0),L
+	LD	(IX+1),H
+	LD	(IX+2),255	;MAX. LINE LENGTH
+	LD	(IX+3),' '	;MIN. ASCII VALUE
+	LD	(IX+4),255	;MAX. ASCII VALUE
+	LD	A,218
+	LD	HL,0
+	CALL	ASBYTE		;FLUSH VDU QUEUE
+	XOR	A
+	LD	HL,SCRAP
+	CALL	ASWORD
+	JP	C,ESC
+	XOR	A
+	RET
+;
+CR	EQU	0DH
+FCBSIZ	EQU	128+36+2
+;
+BDOS	EQU	5
+;
+BRKFLG	EQU	0FF80H
+BRKPTR	EQU	0FF82H
+ASRDCH	EQU	0FFE0H
+ASWRCH	EQU	0FFEEH
+ASWORD	EQU	0FFF1H
+ASBYTE	EQU	0FFF4H
+ASCLI	EQU	0FFF7H
+BRKVEC	EQU	0FFFAH
+;
+FCB	EQU	5CH
+DSKBUF	EQU	80H
+;
+TABLE:	DEFS	14		;FILE BLOCK POINTERS
+INILEN	EQU	$-TABLE
+SCRAP:	DEFS	31
+	DEFB	0
+;
+FIN:	END
+                                                                                                       

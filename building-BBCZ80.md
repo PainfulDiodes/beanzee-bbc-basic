@@ -63,7 +63,7 @@ The `convert-source.sh` script automates this conversion:
 ./convert-source.sh
 ```
 
-This creates backups in `src-backup/` before modifying files in place.
+This copies files from `src/` to `asm/`, renaming from `.Z80` to `.asm` and applying the directive translations. The original source files are preserved.
 
 ## Build Approach
 
