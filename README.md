@@ -1,4 +1,9 @@
-# BBCZ80
+# BBCZ80 for BeanZee
+
+This is a fork of [R.T.Russell's BBCZ80](https://www.bbcbasic.co.uk/bbcbasic/z80basic.html) for use on [BeanZee](https://github.com/PainfulDiodes/BeanZee).
+
+## BBCZ80
+
 BBC BASIC (Z80) v5 is an implementation of the BBC BASIC programming language for the Z80 CPU.
 It is largely compatible with Acorn's ARM BASIC V but with a few language extensions based on
 features of 'BBC BASIC for Windows' and 'BBC BASIC for SDL 2.0'.  These extensions include the
