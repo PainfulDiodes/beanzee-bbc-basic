@@ -2,9 +2,9 @@
 
 # z88dk modular build script for BBC BASIC Z80
 # Usage:
-#   ./build-modular.sh             # Build CP/M version (default)
-#   ./build-modular.sh cpm         # Build CP/M version
-#   ./build-modular.sh acorn       # Build Acorn tube version
+#   build/build.sh             # Build CP/M version (default)
+#   build/build.sh cpm         # Build CP/M version
+#   build/build.sh acorn       # Build Acorn tube version
 #
 # Requires: z88dk with z88dk-z80asm
 #
@@ -16,14 +16,10 @@
 set -e  # Exit on error
 
 # Configuration
-OUTPUT_DIR="output"
-ASM_DIR="asm"
+BUILD_DIR="build"
 
 # Target selection
 TARGET="${1:-cpm}"
-
-# Create output directory
-mkdir -p "$OUTPUT_DIR"
 
 # Module list varies by target
 case "$TARGET" in
@@ -49,33 +45,33 @@ esac
 echo "Building BBC BASIC Z80 ($TARGET) - Modular Build"
 echo "================================================="
 
-# Check asm directory exists
-if [ ! -d "$ASM_DIR" ]; then
-    echo "Error: $ASM_DIR directory not found."
+# Check converted source files exist
+if [ ! -f "$BUILD_DIR/constants.inc" ]; then
+    echo "Error: Converted source files not found in $BUILD_DIR/"
     echo "Run ./convert-source.sh first to convert source files."
     exit 1
 fi
 
-# Clean previous build
-rm -f "$OUTPUT_DIR"/*.o "$OUTPUT_DIR"/*.bin "$OUTPUT_DIR"/*.map "$OUTPUT_DIR"/*.lis
+# Clean previous build artifacts
+rm -f "$BUILD_DIR"/*.o "$BUILD_DIR"/*.bin "$BUILD_DIR"/*.map "$BUILD_DIR"/*.lis
 
 # Assemble each module to object file
 echo ""
 echo "Assembling modules..."
 for module in $MODULES; do
-    if [ ! -f "$ASM_DIR/$module.asm" ]; then
-        echo "Error: $ASM_DIR/$module.asm not found"
+    if [ ! -f "$BUILD_DIR/$module.asm" ]; then
+        echo "Error: $BUILD_DIR/$module.asm not found"
         exit 1
     fi
     echo "  $module.asm -> $module.o"
-    z88dk-z80asm -I"$ASM_DIR" -l -m -o"$OUTPUT_DIR/$module.o" "$ASM_DIR/$module.asm"
+    z88dk-z80asm -I"$BUILD_DIR" -l -m -o"$BUILD_DIR/$module.o" "$BUILD_DIR/$module.asm"
 done
 
 # Build object file list for linking
 # All modules linked together; DATA follows code
 ALL_OBJS=""
 for module in $MODULES; do
-    ALL_OBJS="$ALL_OBJS $OUTPUT_DIR/$module.o"
+    ALL_OBJS="$ALL_OBJS $BUILD_DIR/$module.o"
 done
 
 # Link all modules together
@@ -84,19 +80,19 @@ done
 echo ""
 echo "Linking all modules at $CODE_ORG..."
 z88dk-z80asm -b -m \
-    -o"$OUTPUT_DIR/$OUTPUT_NAME.bin" \
+    -o"$BUILD_DIR/$OUTPUT_NAME.bin" \
     -r$CODE_ORG \
     $ALL_OBJS
 
 # Report size
-BIN_SIZE=$(wc -c < "$OUTPUT_DIR/$OUTPUT_NAME.bin" | tr -d ' ')
+BIN_SIZE=$(wc -c < "$BUILD_DIR/$OUTPUT_NAME.bin" | tr -d ' ')
 
 echo ""
 echo "Build complete:"
-echo "  Binary: $OUTPUT_DIR/$OUTPUT_NAME.bin ($BIN_SIZE bytes at $CODE_ORG)"
+echo "  Binary: $BUILD_DIR/$OUTPUT_NAME.bin ($BIN_SIZE bytes at $CODE_ORG)"
 echo ""
 echo "Note: DATA segment follows code; not at fixed address $DATA_ORG"
-echo "See map file: $OUTPUT_DIR/$OUTPUT_NAME.map"
+echo "See map file: $BUILD_DIR/$OUTPUT_NAME.map"
 
 # Compare with reference if available
 REF_BIN="bin/$TARGET/BBCBASIC.COM"

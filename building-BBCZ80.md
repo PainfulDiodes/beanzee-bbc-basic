@@ -63,13 +63,13 @@ The `convert-source.sh` script automates these conversions:
 ./convert-source.sh
 ```
 
-This copies files from `src/` to `asm/`, renaming from `.Z80` to `.asm` and applying:
+This copies files from `src/` to `build/`, renaming from `.Z80` to `.asm` and applying:
 
 - Directive translations (GLOBAL→PUBLIC, EXTRN→EXTERN)
 - Comment out ORG and END directives (linker controls placement)
 - Convert string quotes (single to double for DEFM)
 - Convert character expressions (`'X' AND 1FH` to numeric values)
-- Add `INCLUDE "constants.inc"` to each module
+- Add `INCLUDE "constants.inc"` to each module (resolved via `-I` flag)
 - Comment out duplicate EQU definitions (centralised in `constants.inc`)
 - Handle special cases (DIST.Z80 ORG 1F0H → DEFS padding)
 
@@ -77,20 +77,21 @@ The original source files are preserved unchanged.
 
 ## Build Process
 
-The build mirrors the original CP/M linker-based approach, assembling each module separately and linking them together:
+The build mirrors the original CP/M linker-based approach, assembling each module separately and linking them together. All converted source and build artifacts are placed in `build/`:
 
 ```bash
-./convert-source.sh   # Convert source files (run once)
-./build.sh cpm        # Build CP/M version
-./build.sh acorn      # Build Acorn version
+./convert-source.sh       # Convert source files to build/ (run once)
+build/build.sh cpm        # Build CP/M version
+build/build.sh acorn      # Build Acorn version
 ```
 
 **Process:**
 
-1. Each module assembled separately to `.o` object files
-2. Linker combines all object files
-3. Cross-module references resolved via PUBLIC/EXTERN declarations
-4. Output binary at CODE_ORG (0x0100)
+1. `convert-source.sh` copies and converts `src/*.Z80` to `build/*.asm`
+2. Each module assembled separately to `build/*.o` object files
+3. Linker combines all object files
+4. Cross-module references resolved via PUBLIC/EXTERN declarations
+5. Output binary at CODE_ORG (0x0100)
 
 ## Memory Layout
 
@@ -125,9 +126,9 @@ After building, verify the output:
 The modular build is working. Each module compiles separately, preserving namespace isolation.
 
 ```bash
-./convert-source.sh   # Convert source files
-./build.sh cpm        # Build CP/M version (19568 bytes)
-./build.sh acorn      # Build Acorn version (19740 bytes)
+./convert-source.sh       # Convert source files
+build/build.sh cpm        # Build CP/M version (19568 bytes)
+build/build.sh acorn      # Build Acorn version (19740 bytes)
 ```
 
 Note: The DATA segment currently follows code directly instead of being placed at a fixed address (0x4B00 for CP/M, 0x4C00 for Acorn). This results in slightly larger binaries than the reference versions.

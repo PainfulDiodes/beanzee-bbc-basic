@@ -3,7 +3,7 @@
 # Translate CP/M assembler directives to z88dk syntax
 # Usage: ./convert-source.sh
 #
-# Copies .Z80 files from src/ to asm/ with .asm extension, converting:
+# Copies .Z80 files from src/ to build/ with .asm extension, converting:
 #   GLOBAL -> PUBLIC (for modular linking)
 #   EXTRN  -> EXTERN (for modular linking)
 #   TITLE  -> ; TITLE (commented out)
@@ -20,12 +20,12 @@
 set -e
 
 SRC_DIR="src"
-ASM_DIR="asm"
+ASM_DIR="build"
 
 echo "Translating CP/M directives to z88dk syntax"
 echo "============================================"
 
-# Create asm directory for converted files
+# Create build directory for converted files
 mkdir -p "$ASM_DIR"
 
 # Create shared constants file
@@ -239,8 +239,4 @@ echo "Translation complete."
 echo "Converted files saved to: $ASM_DIR/"
 echo "Shared constants saved to: $ASM_DIR/constants.inc"
 echo ""
-echo "Notes:"
-echo "  - PUBLIC/EXTERN directives enabled for modular linking"
-echo "  - DIST.asm ORG 1F0H converted to DEFS padding"
-echo ""
-echo "See building-BBCZ80.md for details."
+echo "To build: build/build.sh [cpm|acorn]"
