@@ -2,14 +2,15 @@
 
 # Remove build artifacts (object files, binaries, listings, maps)
 # Preserves converted .asm source files
-# Usage: build/clean.sh
+# Usage: cd build && ./clean.sh
 
 set -e
 
-BUILD_DIR="build"
+# Run from the script's directory
+cd "$(dirname "$0")"
 
 count=0
-for pattern in "$BUILD_DIR"/*.o "$BUILD_DIR"/*.bin "$BUILD_DIR"/*.map "$BUILD_DIR"/*.lis; do
+for pattern in *.o *.bin *.map *.lis; do
     for file in $pattern; do
         if [ -f "$file" ]; then
             rm -f "$file"
@@ -19,7 +20,7 @@ for pattern in "$BUILD_DIR"/*.o "$BUILD_DIR"/*.bin "$BUILD_DIR"/*.map "$BUILD_DI
 done
 
 if [ "$count" -gt 0 ]; then
-    echo "Removed $count build artifact(s) from $BUILD_DIR/"
+    echo "Removed $count build artifact(s)"
 else
     echo "Nothing to clean"
 fi

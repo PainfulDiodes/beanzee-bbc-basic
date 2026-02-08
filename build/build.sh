@@ -2,9 +2,9 @@
 
 # z88dk modular build script for BBC BASIC Z80
 # Usage:
-#   build/build.sh             # Build CP/M version (default)
-#   build/build.sh cpm         # Build CP/M version
-#   build/build.sh acorn       # Build Acorn tube version
+#   cd build && ./build.sh             # Build CP/M version (default)
+#   cd build && ./build.sh cpm         # Build CP/M version
+#   cd build && ./build.sh acorn       # Build Acorn tube version
 #
 # Requires: z88dk with z88dk-z80asm
 #
@@ -15,8 +15,8 @@
 
 set -e  # Exit on error
 
-# Configuration
-BUILD_DIR="build"
+# Run from the script's directory
+cd "$(dirname "$0")"
 
 # Target selection
 TARGET="${1:-cpm}"
@@ -46,32 +46,32 @@ echo "Building BBC BASIC Z80 ($TARGET) - Modular Build"
 echo "================================================="
 
 # Check converted source files exist
-if [ ! -f "$BUILD_DIR/constants.inc" ]; then
-    echo "Error: Converted source files not found in $BUILD_DIR/"
+if [ ! -f "constants.inc" ]; then
+    echo "Error: Converted source files not found."
     echo "Run ./convert.sh first to convert source files."
     exit 1
 fi
 
 # Clean previous build artifacts
-rm -f "$BUILD_DIR"/*.o "$BUILD_DIR"/*.bin "$BUILD_DIR"/*.map "$BUILD_DIR"/*.lis
+rm -f *.o *.bin *.map *.lis
 
 # Assemble each module to object file
 echo ""
 echo "Assembling modules..."
 for module in $MODULES; do
-    if [ ! -f "$BUILD_DIR/$module.asm" ]; then
-        echo "Error: $BUILD_DIR/$module.asm not found"
+    if [ ! -f "$module.asm" ]; then
+        echo "Error: $module.asm not found"
         exit 1
     fi
     echo "  $module.asm -> $module.o"
-    z88dk-z80asm -I"$BUILD_DIR" -l -m -o"$BUILD_DIR/$module.o" "$BUILD_DIR/$module.asm"
+    z88dk-z80asm -l -m -o"$module.o" "$module.asm"
 done
 
 # Build object file list for linking
 # All modules linked together; DATA follows code
 ALL_OBJS=""
 for module in $MODULES; do
-    ALL_OBJS="$ALL_OBJS $BUILD_DIR/$module.o"
+    ALL_OBJS="$ALL_OBJS $module.o"
 done
 
 # Link all modules together
@@ -80,24 +80,24 @@ done
 echo ""
 echo "Linking all modules at $CODE_ORG..."
 z88dk-z80asm -b -m \
-    -o"$BUILD_DIR/$OUTPUT_NAME.bin" \
+    -o"$OUTPUT_NAME.bin" \
     -r$CODE_ORG \
     $ALL_OBJS
 
 # Report size
-BIN_SIZE=$(wc -c < "$BUILD_DIR/$OUTPUT_NAME.bin" | tr -d ' ')
+BIN_SIZE=$(wc -c < "$OUTPUT_NAME.bin" | tr -d ' ')
 
 echo ""
 echo "Build complete:"
-echo "  Binary: $BUILD_DIR/$OUTPUT_NAME.bin ($BIN_SIZE bytes at $CODE_ORG)"
+echo "  Binary: $OUTPUT_NAME.bin ($BIN_SIZE bytes at $CODE_ORG)"
 echo ""
 echo "Note: DATA segment follows code; not at fixed address $DATA_ORG"
-echo "See map file: $BUILD_DIR/$OUTPUT_NAME.map"
+echo "See map file: $OUTPUT_NAME.map"
 
 # Compare with reference if available
-REF_BIN="bin/$TARGET/BBCBASIC.COM"
+REF_BIN="../bin/$TARGET/BBCBASIC.COM"
 if [ -f "$REF_BIN" ]; then
     REF_SIZE=$(wc -c < "$REF_BIN" | tr -d ' ')
     echo ""
-    echo "Reference binary: $REF_BIN ($REF_SIZE bytes)"
+    echo "Reference binary: $REF_SIZE bytes"
 fi
