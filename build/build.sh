@@ -46,7 +46,7 @@ echo "Building BBC BASIC Z80 ($TARGET) - Modular Build"
 echo "================================================="
 
 # Check converted source files exist
-if [ ! -f "constants.inc" ]; then
+if [ ! -f "MAIN.asm" ]; then
     echo "Error: Converted source files not found."
     echo "Run ./convert.sh first to convert source files."
     exit 1

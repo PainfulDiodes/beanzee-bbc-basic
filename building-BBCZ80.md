@@ -69,9 +69,9 @@ This copies files from `src/` to `build/`, renaming from `.Z80` to `.asm` and ap
 - Comment out ORG and END directives (linker controls placement)
 - Convert string quotes (single to double for DEFM)
 - Convert character expressions (`'X' AND 1FH` to numeric values)
-- Add `INCLUDE "constants.inc"` to each module (resolved via `-I` flag)
-- Comment out duplicate EQU definitions (centralised in `constants.inc`)
 - Handle special cases (DIST.Z80 ORG 1F0H → DEFS padding)
+
+EQU definitions are left intact in each module. Since modules are assembled independently, duplicate definitions across modules (e.g., `CR EQU 0DH` in several files) don't conflict.
 
 The original source files are preserved unchanged.
 
