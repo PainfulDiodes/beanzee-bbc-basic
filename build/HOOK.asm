@@ -1,5 +1,4 @@
 ;
-	INCLUDE "constants.inc"
 	PUBLIC CLG
 	PUBLIC COLOUR
 	PUBLIC DRAW

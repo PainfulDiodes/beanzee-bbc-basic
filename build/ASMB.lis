@@ -1,1089 +1,1011 @@
 ASMB.asm:
      1                          	; TITLE BBC BASIC (C) R.T.RUSSELL 1981-2024
-     2                          	INCLUDE "constants.inc"
-constants.inc:
-     1                          ; BBC BASIC Z80 - Shared Constants
-     2                          ; Extracted from source modules to avoid duplicate definitions
-     3                          
-     4                          ; ASCII control characters
-     5                          LF      EQU     0AH
-     6                          CR      EQU     0DH
-     7                          ; Note: ESC conflicts with label in AMOS.Z80, not included
-     8                          BEL     EQU     7
-     9                          BS      EQU     8
-    10                          HT      EQU     9
-    11                          VT      EQU     0BH
-    12                          ; Note: DEL conflicts with label in MAIN.Z80, not included
-    13                          
-    14                          ; CP/M system addresses
-    15                          ; Note: BDOS conflicts with label in DIST.Z80, not included
-    16                          FCB     EQU     5CH
-    17                          DSKBUF  EQU     80H
-    18                          FCBSIZ  EQU     128+36+2
-    19                          
-    20                          ; Token values
-    21                          TAND    EQU     80H
-    22                          TOR     EQU     84H
-    23                          TBY     EQU     0FH
-    24                          TERROR  EQU     85H
-    25                          TLINE   EQU     86H
-    26                          TOFF    EQU     87H
-    27                          TSTEP   EQU     88H
-    28                          TSPC    EQU     89H
-    29                          TTAB    EQU     8AH
-    30                          TELSE   EQU     8BH
-    31                          TTHEN   EQU     8CH
-    32                          TLINO   EQU     8DH
-    33                          TTO     EQU     0B8H
-    34                          TCASE   EQU     0C8H
-    35                          TWHILE  EQU     0C7H
-    36                          TWHEN   EQU     0C9H
-    37                          TOF     EQU     0CAH
-    38                          TENDCASE EQU    0CBH
-    39                          TOTHERWISE EQU  0CCH
-    40                          TENDIF  EQU     0CDH
-    41                          TENDWHILE EQU   0CEH
-    42                          TCALL   EQU     0D6H
-    43                          TDATA   EQU     0DCH
-    44                          TDEF    EQU     0DDH
-    45                          TDIM    EQU     0DEH
-    46                          TEND    EQU     0E0H
-    47                          TFOR    EQU     0E3H
-    48                          TGOSUB  EQU     0E4H
-    49                          TGOTO   EQU     0E5H
-    50                          TIF     EQU     0E7H
-    51                          TLOCAL  EQU     0EAH
-    52                          TMODE   EQU     0EBH
-    53                          TNEXT   EQU     0EDH
-    54                          TON     EQU     0EEH
-    55                          TPROC   EQU     0F2H
-    56                          TREM    EQU     0F4H
-    57                          TREPEAT EQU     0F5H
-    58                          TREPORT EQU     0F6H
-    59                          TRESTORE EQU    0F7H
-    60                          TRETURN EQU     0F8H
-    61                          TSTOP   EQU     0FAH
-    62                          TTRACE  EQU     0FCH
-    63                          TUNTIL  EQU     0FDH
-    64                          TWIDTH  EQU     0FEH
-    65                          TEXIT   EQU     10H
-    66                          
-    67                          ; Error codes
-    68                          BADOP   EQU     1
-    69                          DIVBY0  EQU     18
-    70                          ; Note: TOOBIG conflicts with label in MAIN.Z80, not included
-    71                          NGROOT  EQU     21
-    72                          LOGRNG  EQU     22
-    73                          ACLOST  EQU     23
-    74                          EXPRNG  EQU     24
-    75                          
-ASMB.asm:
-     3                          ;
-     4                          ;BBC BASIC INTERPRETER - Z80 VERSION
-     5                          ;Z80 CPU ASSEMBLER MODULE - "ASMB"
-     6                          ;(C) COPYRIGHT R.T.RUSSELL 1981-2024
-     7                          ;
-     8                          ;THE NAME BBC BASIC IS USED WITH THE PERMISSION
-     9                          ;OF THE BRITISH BROADCASTING CORPORATION AND IS
-    10                          ;NOT TRANSFERRABLE TO A FORKED OR DERIVED WORK.
-    11                          ;
-    12                          ;VERSION 5.0, 14-05-2024
-    13                          ;
-    14                          	PUBLIC ASSEM
-    15                          ;
-    16                          	EXTERN TABIT
-    17                          	EXTERN CRLF
-    18                          	EXTERN OUT
-    19                          	EXTERN VAR
-    20                          	EXTERN ZERO
-    21                          	EXTERN STOREN
-    22                          	EXTERN ERROR
-    23                          	EXTERN EXPRI
-    24                          	EXTERN EXPRS
-    25                          ;
-    26                          	EXTERN LISTON
-    27                          	EXTERN COUNT
-    28                          	EXTERN ACCS
-    29                          	EXTERN OC
-    30                          	EXTERN PC
-    31                          ;
-    32                          ; CR EQU	0DH
-    33                          ; TAND EQU	80H
-    34                          ; TOR EQU	84H
-    35                          ; TERROR EQU	85H
-    36                          ; TCALL EQU	0D6H
-    37                          ; TDEF EQU	0DDH
-    38                          ;
-    39                          ;ASSEMBLER:
-    40                          ;LANGUAGE-INDEPENDENT CONTROL SECTION:
-    41                          ; Outputs: A=delimiter, carry set if syntax error.
-    42                          ;
-    43  0000  cd8803            ASSEM:	CALL	SKIP
-    44  0003  fd23              	INC	IY
-    45  0005  fe3a              	CP	':'
-    46  0007  28f7              	JR	Z,ASSEM
-    47  0009  fe5d              	CP	']'
-    48  000b  c8                	RET	Z
-    49  000c  fe0d              	CP	CR
-    50  000e  c8                	RET	Z
-    51  000f  fd2b              	DEC	IY
-    52  0011  dd2a0000          	LD	IX,(PC)		;PROGRAM COUNTER
-    53  0015  210000            	LD	HL,LISTON
-    54  0018  cb76              	BIT	6,(HL)
-    55  001a  2804              	JR	Z,ASSEM0
-    56  001c  dd2a0000          	LD	IX,(OC)		;ORIGIN of CODE
-    57  0020  dde5              ASSEM0:	PUSH	IX
-    58  0022  fde5              	PUSH	IY
-    59  0024  cdb400            	CALL	ASMB
-    60  0027  c1                	POP	BC
-    61  0028  d1                	POP	DE
-    62  0029  d8                	RET	C
-    63  002a  cd8803            	CALL	SKIP
-    64  002d  37                	SCF
-    65  002e  c0                	RET	NZ
-    66  002f  fd2b              	DEC	IY
-    67  0031  fd23              ASSEM3:	INC	IY
-    68  0033  fd7e00            	LD	A,(IY)
-    69  0036  cdac03            	CALL	TERM0
-    70  0039  20f6              	JR	NZ,ASSEM3
-    71  003b  3a0000            	LD	A,(LISTON)
-    72  003e  dde5              	PUSH	IX
-    73  0040  e1                	POP	HL
-    74  0041  b7                	OR	A
-    75  0042  ed52              	SBC	HL,DE
-    76  0044  eb                	EX	DE,HL		;DE= NO. OF BYTES
-    77  0045  e5                	PUSH	HL
-    78  0046  2a0000            	LD	HL,(PC)
-    79  0049  e5                	PUSH	HL
-    80  004a  19                	ADD	HL,DE
-    81  004b  220000            	LD	(PC),HL		;UPDATE PC
-    82  004e  cb77              	BIT	6,A
-    83  0050  2807              	JR	Z,ASSEM5
-    84  0052  2a0000            	LD	HL,(OC)
-    85  0055  19                	ADD	HL,DE
-    86  0056  220000            	LD	(OC),HL		;UPDATE OC
-    87  0059  e1                ASSEM5:	POP	HL		;OLD PC
-    88  005a  dde1              	POP	IX		;CODE HERE
-    89  005c  cb67              	BIT	4,A
-    90  005e  28a0              	JR	Z,ASSEM
-    91  0060  7c                	LD	A,H
-    92  0061  cda000            	CALL	HEX
-    93  0064  7d                	LD	A,L
-    94  0065  cd9900            	CALL	HEXSP
-    95  0068  af                	XOR	A
-    96  0069  bb                	CP	E
-    97  006a  2815              	JR	Z,ASSEM2
-    98  006c  3a0000            ASSEM1:	LD	A,(COUNT)
-    99  006f  fe11              	CP	17
-   100  0071  3e05              	LD	A,5
-   101  0073  d40000            	CALL	NC,TABIT	;NEXT LINE
-   102  0076  dd7e00            	LD	A,(IX)
-   103  0079  cd9900            	CALL	HEXSP
-   104  007c  dd23              	INC	IX
-   105  007e  1d                	DEC	E
-   106  007f  20eb              	JR	NZ,ASSEM1
-   107  0081  3e12              ASSEM2:	LD	A,18
-   108  0083  cd0000            	CALL	TABIT
-   109  0086  fde5              	PUSH	IY
-   110  0088  e1                	POP	HL
-   111  0089  ed42              	SBC	HL,BC
-   112  008b  0a                ASSEM4:	LD	A,(BC)
-   113  008c  cd0000            	CALL	OUT
-   114  008f  03                	INC	BC
-   115  0090  2d                	DEC	L
-   116  0091  20f8              	JR	NZ,ASSEM4
-   117  0093  cd0000            	CALL	CRLF
-   118  0096  c30000            	JP	ASSEM
-   119                          ;
-   120  0099  cda000            HEXSP:	CALL	HEX
-   121  009c  3e20              	LD	A,' '
-   122  009e  1811              	JR	OUTCH1
-   123  00a0  f5                HEX:	PUSH	AF
-   124  00a1  0f                	RRCA
-   125  00a2  0f                	RRCA
-   126  00a3  0f                	RRCA
-   127  00a4  0f                	RRCA
-   128  00a5  cda900            	CALL	HEXOUT
-   129  00a8  f1                	POP	AF
-   130  00a9  e60f              HEXOUT:	AND	0FH
-   131  00ab  c690              	ADD	A,90H
-   132  00ad  27                	DAA
-   133  00ae  ce40              	ADC	A,40H
-   134  00b0  27                	DAA
-   135  00b1  c30000            OUTCH1:	JP	OUT
-   136                          ;
-   137                          ;PROCESSOR-SPECIFIC TRANSLATION SECTION:
-   138                          ;
-   139                          ;REGISTER USAGE: B - TYPE OF MOST RECENT OPERAND
-   140                          ;                C - OPCODE BEING BUILT
-   141                          ;                D - (IX) OR (IY) FLAG
-   142                          ;                E - OFFSET FROM IX OR IY
-   143                          ;               HL - NUMERIC OPERAND VALUE
-   144                          ;               IX - CODE DESTINATION
-   145                          ;               IY - SOURCE TEXT POINTER
-   146                          ;   Inputs: A = initial character
-   147                          ;  Outputs: Carry set if syntax error.
-   148                          ;
-   149  00b4  fe2e              ASMB:	CP	'.'
-   150  00b6  2028              	JR	NZ,ASMB1
-   151  00b8  fd23              	INC	IY
-   152  00ba  dde5              	PUSH	IX
-   153  00bc  cd0000            	CALL	VAR
-   154  00bf  f5                	PUSH	AF
-   155  00c0  cd0000            	CALL	ZERO
-   156  00c3  d9                	EXX
-   157  00c4  2a0000            	LD	HL,(PC)
-   158  00c7  d9                	EXX
-   159  00c8  3a0000            	LD	A,(LISTON)
-   160  00cb  e620              	AND	20H
-   161  00cd  200b              	JR	NZ,ASMB0
-   162  00cf  dd7e00            	LD	A,(IX)
-   163  00d2  ddb601            	OR	(IX+1)
-   164  00d5  3e03              	LD	A,3
-   165  00d7  c20000            	JP	NZ,ERROR	;Multiple label
-   166  00da  f1                ASMB0:	POP	AF
-   167  00db  cd0000            	CALL	STOREN
-   168  00de  dde1              	POP	IX
-   169  00e0  cd8803            ASMB1:	CALL	SKIP
-   170  00e3  c8                	RET	Z
-   171  00e4  fed6              	CP	TCALL
-   172  00e6  0ec4              	LD	C,0C4H
-   173  00e8  fd23              	INC	IY
-   174  00ea  cad701            	JP	Z,GRPC
-   175  00ed  fd2b              	DEC	IY
-   176  00ef  21b203            	LD	HL,OPCODS
-   177  00f2  cd3f03            	CALL	FIND
-   178  00f5  d8                	RET	C
-   179  00f6  48                	LD	C,B	;ROOT OPCODE
-   180  00f7  1600              	LD	D,0	;CLEAR IX/IY FLAG
-   181                          ;
-   182                          ;GROUP 0 - TRIVIAL CASES REQUIRING NO COMPUTATION
-   183                          ;GROUP 1 - AS GROUP 0 BUT WITH "ED" PREFIX
-   184                          ;
-   185  00f9  d627              	SUB	39
-   186  00fb  3007              	JR	NC,GROUP2
-   187  00fd  fee8              	CP	15-39
-   188  00ff  d4a502            	CALL	NC,ED
-   189  0102  1868              	JR	BYTE0
-   190                          ;
-   191                          ;GROUP 2 - BIT, RES, SET
-   192                          ;GROUP 3 - RLC, RRC, RL, RR, SLA, SRA, SRL
-   193                          ;
-   194  0104  d60a              GROUP2:	SUB	10
-   195  0106  300f              	JR	NC,GROUP4
-   196  0108  fef9              	CP	3-10
-   197  010a  dc2f03            	CALL	C,BIT
-   198  010d  d8                	RET	C
-   199  010e  cd0403            	CALL	REGLO
-   200  0111  d8                	RET	C
-   201  0112  cda902            	CALL	CB
-   202  0115  1855              	JR	BYTE0
-   203                          ;
-   204                          ;GROUP 4 - PUSH, POP, EX (SP)
-   205                          ;
-   206  0117  d603              GROUP4:	SUB	3
-   207  0119  3006              	JR	NC,GROUP5
-   208  011b  cd2303            G4:	CALL	PAIR
-   209  011e  d8                	RET	C
-   210  011f  184b              	JR	BYTE0
-   211                          ;
-   212                          ;GROUP 5 - SUB, AND, XOR, OR, CP
-   213                          ;GROUP 6 - ADD, ADC, SBC
-   214                          ;
-   215  0121  d60a              GROUP5:	SUB	8+2
-   216  0123  3032              	JR	NC,GROUP7
-   217  0125  fefd              	CP	5-8
-   218  0127  0607              	LD	B,7
-   219  0129  d4b702            	CALL	NC,OPND
-   220  012c  78                	LD	A,B
-   221  012d  fe07              	CP	7
-   222  012f  2010              	JR	NZ,G6HL
-   223  0131  cd0403            G6:	CALL	REGLO
-   224  0134  79                	LD	A,C
-   225  0135  3028              	JR	NC,BIND1
-   226  0137  ee46              	XOR	46H
-   227  0139  cdab02            	CALL	BIND
-   228  013c  cde702            DB:	CALL	NUMBER
-   229  013f  1878              	JR	VAL8
-   230                          ;
-   231  0141  e63f              G6HL:	AND	3FH
-   232  0143  fe0c              	CP	12
-   233  0145  37                	SCF
-   234  0146  c0                	RET	NZ
-   235  0147  79                	LD	A,C
-   236  0148  fe80              	CP	80H
-   237  014a  0e09              	LD	C,9
-   238  014c  28cd              	JR	Z,G4
-   239  014e  ee1c              	XOR	1CH
-   240  0150  0f                	RRCA
-   241  0151  4f                	LD	C,A
-   242  0152  cda502            	CALL	ED
-   243  0155  18c4              	JR	G4
-   244                          ;
-   245                          ;GROUP 7 - INC, DEC
-   246                          ;
-   247  0157  d602              GROUP7:	SUB	2
-   248  0159  3014              	JR	NC,GROUP8
-   249  015b  cd0a03            	CALL	REGHI
-   250  015e  79                	LD	A,C
-   251  015f  d2ab02            BIND1:	JP	NC,BIND
-   252  0162  ee64              	XOR	64H
-   253  0164  07                	RLCA
-   254  0165  07                	RLCA
-   255  0166  07                	RLCA
-   256  0167  4f                	LD	C,A
-   257  0168  cd2703            	CALL	PAIR1
-   258  016b  d8                	RET	C
-   259  016c  79                BYTE0:	LD	A,C
-   260  016d  187f              	JR	BYTE2
-   261                          ;
-   262                          ;GROUP 8 - IN
-   263                          ;GROUP 9 - OUT
-   264                          ;
-   265  016f  d602              GROUP8:	SUB	2
-   266  0171  3021              	JR	NC,GROUPA
-   267  0173  feff              	CP	1-2
-   268  0175  cc9a02            	CALL	Z,CORN
-   269  0178  08                	EX	AF,AF'
-   270  0179  cd0a03            	CALL	REGHI
-   271  017c  d8                	RET	C
-   272  017d  08                	EX	AF,AF'
-   273  017e  dc9a02            	CALL	C,CORN
-   274  0181  24                	INC	H
-   275  0182  28e8              	JR	Z,BYTE0
-   276  0184  78                	LD	A,B
-   277  0185  fe07              	CP	7
-   278  0187  37                	SCF
-   279  0188  c0                	RET	NZ
-   280  0189  79                	LD	A,C
-   281  018a  ee03              	XOR	3
-   282  018c  07                	RLCA
-   283  018d  07                	RLCA
-   284  018e  07                	RLCA
-   285  018f  cdd702            	CALL	BYTE
-   286  0192  1825              	JR	VAL8
-   287                          ;
-   288                          ;GROUP 10 - JR, DJNZ
-   289                          ;
-   290  0194  d602              GROUPA:	SUB	2
-   291  0196  3024              	JR	NC,GROUPB
-   292  0198  feff              	CP	1-2
-   293  019a  c41003            	CALL	NZ,COND
-   294  019d  79                	LD	A,C
-   295  019e  3002              	JR	NC,GRPA
-   296  01a0  3e18              	LD	A,18H
-   297  01a2  cdd702            GRPA:	CALL	BYTE
-   298  01a5  cde702            	CALL	NUMBER
-   299  01a8  ed5b0000          	LD	DE,(PC)
-   300  01ac  13                	INC	DE
-   301  01ad  37                	SCF
-   302  01ae  ed52              	SBC	HL,DE
-   303  01b0  7d                	LD	A,L
-   304  01b1  17                	RLA
-   305  01b2  9f                	SBC	A,A
-   306  01b3  bc                	CP	H
-   307  01b4  3e01              TOOFAR:	LD	A,1
-   308  01b6  c20000            	JP	NZ,ERROR	;"Out of range"
-   309  01b9  7d                VAL8:	LD	A,L
-   310  01ba  1832              	JR	BYTE2
-   311                          ;
-   312                          ;GROUP 11 - JP
-   313                          ;
-   314  01bc  47                GROUPB:	LD	B,A
-   315  01bd  2016              	JR	NZ,GROUPC
-   316  01bf  cd1003            	CALL	COND
-   317  01c2  79                	LD	A,C
-   318  01c3  300b              	JR	NC,GRPB
-   319  01c5  78                	LD	A,B
-   320  01c6  e63f              	AND	3FH
-   321  01c8  fe06              	CP	6
-   322  01ca  3ee9              	LD	A,0E9H
-   323  01cc  2820              	JR	Z,BYTE2
-   324  01ce  3ec3              	LD	A,0C3H
-   325  01d0  cdd702            GRPB:	CALL	BYTE
-   326  01d3  1805              	JR	ADDR
-   327                          ;
-   328                          ;GROUP 12 - CALL
-   329                          ;
-   330  01d5  100c              GROUPC:	DJNZ	GROUPD
-   331  01d7  cdf201            GRPC:	CALL	GRPE
-   332  01da  cde702            ADDR:	CALL	NUMBER
-   333  01dd  cdb901            VAL16:	CALL	VAL8
-   334  01e0  7c                	LD	A,H
-   335  01e1  180b              	JR	BYTE2
-   336                          ;
-   337                          ;GROUP 13 - RST
-   338                          ;
-   339  01e3  100b              GROUPD:	DJNZ	GROUPE
-   340  01e5  cde702            	CALL	NUMBER
-   341  01e8  a1                	AND	C
-   342  01e9  b4                	OR	H
-   343  01ea  20c8              	JR	NZ,TOOFAR
-   344  01ec  7d                	LD	A,L
-   345  01ed  b1                	OR	C
-   346  01ee  1878              BYTE2:	JR	BYTE1
-   347                          ;
-   348                          ;GROUP 14 - RET
-   349                          ;
-   350  01f0  100a              GROUPE:	DJNZ	GROUPF
-   351  01f2  cd1003            GRPE:	CALL	COND
-   352  01f5  79                	LD	A,C
-   353  01f6  3070              	JR	NC,BYTE1
-   354  01f8  f609              	OR	9
-   355  01fa  186c              	JR	BYTE1
-   356                          ;
-   357                          ;GROUP 15 - LD
-   358                          ;
-   359  01fc  106c              GROUPF:	DJNZ	MISC
-   360  01fe  cd3c03            	CALL	LDOP
-   361  0201  305f              	JR	NC,LDA
-   362  0203  cd0a03            	CALL	REGHI
-   363  0206  08                	EX	AF,AF'
-   364  0207  cd8803            	CALL	SKIP
-   365  020a  fe28              	CP	'('
-   366  020c  281d              	JR	Z,LDIN
-   367  020e  08                	EX	AF,AF'
-   368  020f  d23101            	JP	NC,G6
-   369  0212  0e01              	LD	C,1
-   370  0214  cd2703            	CALL	PAIR1
-   371  0217  d8                	RET	C
-   372  0218  3e0e              	LD	A,14
-   373  021a  b8                	CP	B
-   374  021b  47                	LD	B,A
-   375  021c  cc2303            	CALL	Z,PAIR
-   376  021f  78                	LD	A,B
-   377  0220  e63f              	AND	3FH
-   378  0222  fe0c              	CP	12
-   379  0224  79                	LD	A,C
-   380  0225  20a9              	JR	NZ,GRPB
-   381  0227  3ef9              	LD	A,0F9H
-   382  0229  183d              	JR	BYTE1
-   383                          ;
-   384  022b  08                LDIN:	EX	AF,AF'
-   385  022c  c5                	PUSH	BC
-   386  022d  d40403            	CALL	NC,REGLO
-   387  0230  79                	LD	A,C
-   388  0231  c1                	POP	BC
-   389  0232  3077              	JR	NC,BIND
-   390  0234  0e0a              	LD	C,0AH
-   391  0236  cd2703            	CALL	PAIR1
-   392  0239  cd8102            	CALL	LD16
-   393  023c  3092              	JR	NC,GRPB
-   394  023e  cde702            	CALL	NUMBER
-   395  0241  0e02              	LD	C,2
-   396  0243  cd2303            	CALL	PAIR
-   397  0246  cd8102            	CALL	LD16
-   398  0249  d8                	RET	C
-   399  024a  cdd702            	CALL	BYTE
-   400  024d  188e              	JR	VAL16
-   401                          ;
-   402                          ;OPT - SET OPTION
-   403                          ;
-   404  024f  05                OPT:	DEC	B
-   405  0250  ca3c01            	JP	Z,DB
-   406  0253  1085              	DJNZ	ADDR
-   407  0255  cde702            	CALL	NUMBER
-   408  0258  210000            	LD	HL,LISTON
-   409  025b  4f                	LD	C,A
-   410  025c  ed6f              	RLD
-   411  025e  79                	LD	A,C
-   412  025f  ed67              	RRD
-   413  0261  c9                	RET
-   414                          ;
-   415  0262  fe04              LDA:	CP	4
-   416  0264  dca502            	CALL	C,ED
-   417  0267  78                	LD	A,B
-   418  0268  186d              BYTE1:	JR	BYTE
-   419                          ;
-   420                          ;MISC - DEFB, DEFW, DEFM
-   421                          ;
-   422  026a  10e3              MISC:	DJNZ	OPT
-   423  026c  dde5              	PUSH	IX
-   424  026e  cd0000            	CALL	EXPRS
-   425  0271  dde1              	POP	IX
-   426  0273  210000            	LD	HL,ACCS
-   427  0276  af                DEFM1:	XOR	A
-   428  0277  bb                	CP	E
-   429  0278  c8                	RET	Z
-   430  0279  7e                	LD	A,(HL)
-   431  027a  23                	INC	HL
-   432  027b  cdd702            	CALL	BYTE
-   433  027e  1d                	DEC	E
-   434  027f  18f5              	JR	DEFM1
-   435                          ;
-   436                          ;SUBROUTINES:
-   437                          ;
-   438  0281  78                LD16:	LD	A,B
-   439  0282  380e              	JR	C,LD8
-   440  0284  78                	LD	A,B
-   441  0285  e63f              	AND	3FH
-   442  0287  fe0c              	CP	12
-   443  0289  79                	LD	A,C
-   444  028a  c8                	RET	Z
-   445  028b  cda502            	CALL	ED
-   446  028e  79                	LD	A,C
-   447  028f  f643              	OR	43H
-   448  0291  c9                	RET
-   449                          ;
-   450  0292  fe07              LD8:	CP	7
-   451  0294  37                	SCF
-   452  0295  c0                	RET	NZ
-   453  0296  79                	LD	A,C
-   454  0297  f630              	OR	30H
-   455  0299  c9                	RET
-   456                          ;
-   457  029a  c5                CORN:	PUSH	BC
-   458  029b  cdb702            	CALL	OPND
-   459  029e  cb68              	BIT	5,B
-   460  02a0  c1                	POP	BC
-   461  02a1  2844              	JR	Z,NUMBER
-   462  02a3  26ff              	LD	H,-1
-   463  02a5  3eed              ED:	LD	A,0EDH
-   464  02a7  182e              	JR	BYTE
-   465                          ;
-   466  02a9  3ecb              CB:	LD	A,0CBH
-   467  02ab  fe76              BIND:	CP	76H
-   468  02ad  37                	SCF
-   469  02ae  c8                	RET	Z		;REJECT LD (HL),(HL)
-   470  02af  cdd702            	CALL	BYTE
-   471  02b2  14                	INC	D
-   472  02b3  f0                	RET	P
-   473  02b4  7b                	LD	A,E
-   474  02b5  1820              	JR	BYTE
-   475                          ;
-   476  02b7  e5                OPND:	PUSH	HL
-   477  02b8  21f904            	LD	HL,OPRNDS
-   478  02bb  cd3f03            	CALL	FIND
-   479  02be  e1                	POP	HL
-   480  02bf  d8                	RET	C
-   481  02c0  cb78              	BIT	7,B
-   482  02c2  c8                	RET	Z
-   483  02c3  cb58              	BIT	3,B
-   484  02c5  e5                	PUSH	HL
-   485  02c6  ccde02            	CALL	Z,OFFSET
-   486  02c9  5d                	LD	E,L
-   487  02ca  e1                	POP	HL
-   488  02cb  3edd              	LD	A,0DDH
-   489  02cd  cb70              	BIT	6,B
-   490  02cf  2802              	JR	Z,OP1
-   491  02d1  3efd              	LD	A,0FDH
-   492  02d3  b7                OP1:	OR	A
-   493  02d4  14                	INC	D
-   494  02d5  57                	LD	D,A
-   495  02d6  f8                	RET	M
-   496  02d7  dd7700            BYTE:	LD	(IX),A
-   497  02da  dd23              	INC	IX
-   498  02dc  b7                	OR	A
-   499  02dd  c9                	RET
-   500                          ;
-   501  02de  fd7e00            OFFSET:	LD	A,(IY)
-   502  02e1  fe29              	CP	')'
-   503  02e3  210000            	LD	HL,0
-   504  02e6  c8                	RET	Z
-   505  02e7  cd8803            NUMBER:	CALL	SKIP
-   506  02ea  c5                	PUSH	BC
-   507  02eb  d5                	PUSH	DE
-   508  02ec  dde5              	PUSH	IX
-   509  02ee  cd0000            	CALL	EXPRI
-   510  02f1  dde1              	POP	IX
-   511  02f3  d9                	EXX
-   512  02f4  d1                	POP	DE
-   513  02f5  c1                	POP	BC
-   514  02f6  7d                	LD	A,L
-   515  02f7  b7                	OR	A
-   516  02f8  c9                	RET
-   517                          ;
-   518  02f9  cdb702            REG:	CALL	OPND
-   519  02fc  d8                	RET	C
-   520  02fd  78                	LD	A,B
-   521  02fe  e63f              	AND	3FH
-   522  0300  fe08              	CP	8
-   523  0302  3f                	CCF
-   524  0303  c9                	RET
-   525                          ;
-   526  0304  cdf902            REGLO:	CALL	REG
-   527  0307  d8                	RET	C
-   528  0308  182f              	JR	ORC
-   529                          ;
-   530  030a  cdf902            REGHI:	CALL	REG
-   531  030d  d8                	RET	C
-   532  030e  1826              	JR	SHL3
-   533                          ;
-   534  0310  cdb702            COND:	CALL	OPND
-   535  0313  d8                	RET	C
-   536  0314  78                	LD	A,B
-   537  0315  e61f              	AND	1FH
-   538  0317  d610              	SUB	16
-   539  0319  301b              	JR	NC,SHL3
-   540  031b  fef1              	CP	-15
-   541  031d  37                	SCF
-   542  031e  c0                	RET	NZ
-   543  031f  3e03              	LD	A,3
-   544  0321  1813              	JR	SHL3
-   545                          ;
-   546  0323  cdb702            PAIR:	CALL	OPND
-   547  0326  d8                	RET	C
-   548  0327  78                PAIR1:	LD	A,B
-   549  0328  e60f              	AND	0FH
-   550  032a  d608              	SUB	8
-   551  032c  d8                	RET	C
-   552  032d  1807              	JR	SHL3
-   553                          ;
-   554  032f  cde702            BIT:	CALL	NUMBER
-   555  0332  fe08              	CP	8
-   556  0334  3f                	CCF
-   557  0335  d8                	RET	C
-   558  0336  07                SHL3:	RLCA
-   559  0337  07                	RLCA
-   560  0338  07                	RLCA
-   561  0339  b1                ORC:	OR	C
-   562  033a  4f                	LD	C,A
-   563  033b  c9                	RET
-   564                          ;
-   565  033c  213e05            LDOP:	LD	HL,LDOPS
-   566  033f  cd8803            FIND:	CALL	SKIP
-   567  0342  0600              EXIT:	LD	B,0
-   568  0344  37                	SCF
-   569  0345  c8                	RET	Z
-   570  0346  fedd              	CP	TDEF
-   571  0348  2804              	JR	Z,FIND0
-   572  034a  fe85              	CP	TOR+1
-   573  034c  3f                	CCF
-   574  034d  d8                	RET	C
-   575  034e  7e                FIND0:	LD	A,(HL)
-   576  034f  b7                	OR	A
-   577  0350  28f0              	JR	Z,EXIT
-   578  0352  fdae00            	XOR	(IY)
-   579  0355  e65f              	AND	01011111B
-   580  0357  2809              	JR	Z,FIND2
-   581  0359  cb7e              FIND1:	BIT	7,(HL)
-   582  035b  23                	INC	HL
-   583  035c  28fb              	JR	Z,FIND1
-   584  035e  23                	INC	HL
-   585  035f  04                	INC	B
-   586  0360  18ec              	JR	FIND0
-   587                          ;
-   588  0362  fde5              FIND2:	PUSH	IY
-   589  0364  cb7e              FIND3:	BIT	7,(HL)
-   590  0366  fd23              	INC	IY
-   591  0368  23                	INC	HL
-   592  0369  2010              	JR	NZ,FIND5
-   593  036b  be                	CP	(HL)
-   594  036c  cc8703            	CALL	Z,SKIP0
-   595  036f  7e                	LD	A,(HL)
-   596  0370  fdae00            	XOR	(IY)
-   597  0373  e65f              	AND	01011111B
-   598  0375  28ed              	JR	Z,FIND3
-   599  0377  fde1              FIND4:	POP	IY
-   600  0379  18de              	JR	FIND1
-   601                          ;
-   602  037b  cd9a03            FIND5:	CALL	DELIM
-   603  037e  c49403            	CALL	NZ,SIGN
-   604  0381  20f4              	JR	NZ,FIND4
-   605  0383  78                FIND6:	LD	A,B
-   606  0384  46                	LD	B,(HL)
-   607  0385  e1                	POP	HL
-   608  0386  c9                	RET
-   609                          ;
-   610  0387  23                SKIP0:	INC	HL
-   611  0388  cd9a03            SKIP:	CALL	DELIM
-   612  038b  c0                	RET	NZ
-   613  038c  cda603            	CALL	TERM
-   614  038f  c8                	RET	Z
-   615  0390  fd23              	INC	IY
-   616  0392  18f4              	JR	SKIP
-   617                          ;
-   618  0394  fe2b              SIGN:	CP	'+'
-   619  0396  c8                	RET	Z
-   620  0397  fe2d              	CP	'-'
-   621  0399  c9                	RET
-   622                          ;
-   623  039a  fd7e00            DELIM:	LD	A,(IY)		;ASSEMBLER DELIMITER
-   624  039d  fe20              	CP	' '
-   625  039f  c8                	RET	Z
-   626  03a0  fe2c              	CP	','
-   627  03a2  c8                	RET	Z
-   628  03a3  fe29              	CP	')'
-   629  03a5  c8                	RET	Z
-   630  03a6  fe3b              TERM:	CP	';'		;ASSEMBLER TERMINATOR
-   631  03a8  c8                	RET	Z
-   632  03a9  fe5c              	CP	5CH
-   633  03ab  c8                	RET	Z
-   634  03ac  fe3a              TERM0:	CP	':'		;ASSEMBLER SEPARATOR
-   635  03ae  d0                	RET	NC
-   636  03af  fe0d              	CP	CR
-   637  03b1  c9                	RET
-   638                          ;
-   639  03b2  4e4f              OPCODS:	DEFM "NO"
-   640  03b4  d0                	DEFB	'P'+80H
-   641  03b5  00                	DEFB	0
-   642  03b6  524c43            	DEFM "RLC"
-   643  03b9  c1                	DEFB	'A'+80H
-   644  03ba  07                	DEFB	7
-   645  03bb  4558              	DEFM "EX"
-   646  03bd  00                	DEFB	0
-   647  03be  4146              	DEFM "AF"
-   648  03c0  00                	DEFB	0
-   649  03c1  4146              	DEFM "AF"
-   650  03c3  a7                	DEFB	27H+80H
-   651  03c4  08                	DEFB	8
-   652  03c5  525243            	DEFM "RRC"
-   653  03c8  c1                	DEFB	'A'+80H
-   654  03c9  0f                	DEFB	0FH
-   655  03ca  524c              	DEFM "RL"
-   656  03cc  c1                	DEFB	'A'+80H
-   657  03cd  17                	DEFB	17H
-   658  03ce  5252              	DEFM "RR"
-   659  03d0  c1                	DEFB	'A'+80H
-   660  03d1  1f                	DEFB	1FH
-   661  03d2  4441              	DEFM "DA"
-   662  03d4  c1                	DEFB	'A'+80H
-   663  03d5  27                	DEFB	27H
-   664  03d6  4350              	DEFM "CP"
-   665  03d8  cc                	DEFB	'L'+80H
-   666  03d9  2f                	DEFB	2FH
-   667  03da  5343              	DEFM "SC"
-   668  03dc  c6                	DEFB	'F'+80H
-   669  03dd  37                	DEFB	37H
-   670  03de  4343              	DEFM "CC"
-   671  03e0  c6                	DEFB	'F'+80H
-   672  03e1  3f                	DEFB	3FH
-   673  03e2  48414c            	DEFM "HAL"
-   674  03e5  d4                	DEFB	'T'+80H
-   675  03e6  76                	DEFB	76H
-   676  03e7  4558              	DEFM "EX"
-   677  03e9  d8                	DEFB	'X'+80H
-   678  03ea  d9                	DEFB	0D9H
-   679  03eb  4558              	DEFM "EX"
-   680  03ed  00                	DEFB	0
-   681  03ee  4445              	DEFM "DE"
-   682  03f0  00                	DEFB	0
-   683  03f1  48                	DEFM "H"
-   684  03f2  cc                	DEFB	'L'+80H
-   685  03f3  eb                	DEFB	0EBH
-   686  03f4  44                	DEFM "D"
-   687  03f5  c9                	DEFB	'I'+80H
-   688  03f6  f3                	DEFB	0F3H
-   689  03f7  45                	DEFM "E"
-   690  03f8  c9                	DEFB	'I'+80H
-   691  03f9  fb                	DEFB	0FBH
-   692                          ;
-   693  03fa  4e45              	DEFM "NE"
-   694  03fc  c7                	DEFB	'G'+80H
-   695  03fd  44                	DEFB	44H
-   696  03fe  494d              	DEFM "IM"
-   697  0400  00                	DEFB	0
-   698  0401  b0                	DEFB	'0'+80H
-   699  0402  46                	DEFB	46H
-   700  0403  524554            	DEFM "RET"
-   701  0406  ce                	DEFB	'N'+80H
-   702  0407  45                	DEFB	45H
-   703  0408  524554            	DEFM "RET"
-   704  040b  c9                	DEFB	'I'+80H
-   705  040c  4d                	DEFB	4DH
-   706  040d  494d              	DEFM "IM"
-   707  040f  00                	DEFB	0
-   708  0410  b1                	DEFB	'1'+80H
-   709  0411  56                	DEFB	56H
-   710  0412  494d              	DEFM "IM"
-   711  0414  00                	DEFB	0
-   712  0415  b2                	DEFB	'2'+80H
-   713  0416  5e                	DEFB	5EH
-   714  0417  5252              	DEFM "RR"
-   715  0419  c4                	DEFB	'D'+80H
-   716  041a  67                	DEFB	67H
-   717  041b  524c              	DEFM "RL"
-   718  041d  c4                	DEFB	'D'+80H
-   719  041e  6f                	DEFB	6FH
-   720  041f  4c44              	DEFM "LD"
-   721  0421  c9                	DEFB	'I'+80H
-   722  0422  a0                	DEFB	0A0H
-   723  0423  4350              	DEFM "CP"
-   724  0425  c9                	DEFB	'I'+80H
-   725  0426  a1                	DEFB	0A1H
-   726  0427  494e              	DEFM "IN"
-   727  0429  c9                	DEFB	'I'+80H
-   728  042a  a2                	DEFB	0A2H
-   729  042b  4f5554            	DEFM "OUT"
-   730  042e  c9                	DEFB	'I'+80H
-   731  042f  a3                	DEFB	0A3H
-   732  0430  4c44              	DEFM "LD"
-   733  0432  c4                	DEFB	'D'+80H
-   734  0433  a8                	DEFB	0A8H
-   735  0434  4350              	DEFM "CP"
-   736  0436  c4                	DEFB	'D'+80H
-   737  0437  a9                	DEFB	0A9H
-   738  0438  494e              	DEFM "IN"
-   739  043a  c4                	DEFB	'D'+80H
-   740  043b  aa                	DEFB	0AAH
-   741  043c  4f5554            	DEFM "OUT"
-   742  043f  c4                	DEFB	'D'+80H
-   743  0440  ab                	DEFB	0ABH
-   744  0441  4c4449            	DEFM "LDI"
-   745  0444  d2                	DEFB	'R'+80H
-   746  0445  b0                	DEFB	0B0H
-   747  0446  435049            	DEFM "CPI"
-   748  0449  d2                	DEFB	'R'+80H
-   749  044a  b1                	DEFB	0B1H
-   750  044b  494e49            	DEFM "INI"
-   751  044e  d2                	DEFB	'R'+80H
-   752  044f  b2                	DEFB	0B2H
-   753  0450  4f5449            	DEFM "OTI"
-   754  0453  d2                	DEFB	'R'+80H
-   755  0454  b3                	DEFB	0B3H
-   756  0455  4c4444            	DEFM "LDD"
-   757  0458  d2                	DEFB	'R'+80H
-   758  0459  b8                	DEFB	0B8H
-   759  045a  435044            	DEFM "CPD"
-   760  045d  d2                	DEFB	'R'+80H
-   761  045e  b9                	DEFB	0B9H
-   762  045f  494e44            	DEFM "IND"
-   763  0462  d2                	DEFB	'R'+80H
-   764  0463  ba                	DEFB	0BAH
-   765  0464  4f5444            	DEFM "OTD"
-   766  0467  d2                	DEFB	'R'+80H
-   767  0468  bb                	DEFB	0BBH
-   768                          ;
-   769  0469  4249              	DEFM "BI"
-   770  046b  d4                	DEFB	'T'+80H
-   771  046c  40                	DEFB	40H
-   772  046d  5245              	DEFM "RE"
-   773  046f  d3                	DEFB	'S'+80H
-   774  0470  80                	DEFB	80H
-   775  0471  5345              	DEFM "SE"
-   776  0473  d4                	DEFB	'T'+80H
-   777  0474  c0                	DEFB	0C0H
-   778                          ;
-   779  0475  524c              	DEFM "RL"
-   780  0477  c3                	DEFB	'C'+80H
-   781  0478  00                	DEFB	0
-   782  0479  5252              	DEFM "RR"
-   783  047b  c3                	DEFB	'C'+80H
-   784  047c  08                	DEFB	8
-   785  047d  52                	DEFM "R"
-   786  047e  cc                	DEFB	'L'+80H
-   787  047f  10                	DEFB	10H
-   788  0480  52                	DEFM "R"
-   789  0481  d2                	DEFB	'R'+80H
-   790  0482  18                	DEFB	18H
-   791  0483  534c              	DEFM "SL"
-   792  0485  c1                	DEFB	'A'+80H
-   793  0486  20                	DEFB	20H
-   794  0487  5352              	DEFM "SR"
-   795  0489  c1                	DEFB	'A'+80H
-   796  048a  28                	DEFB	28H
-   797  048b  5352              	DEFM "SR"
-   798  048d  cc                	DEFB	'L'+80H
-   799  048e  38                	DEFB	38H
-   800                          ;
-   801  048f  504f              	DEFM "PO"
-   802  0491  d0                	DEFB	'P'+80H
-   803  0492  c1                	DEFB	0C1H
-   804  0493  505553            	DEFM "PUS"
-   805  0496  c8                	DEFB	'H'+80H
-   806  0497  c5                	DEFB	0C5H
-   807  0498  4558              	DEFM "EX"
-   808  049a  00                	DEFB	0
-   809  049b  2853              	DEFM "(S"
-   810  049d  d0                	DEFB	'P'+80H
-   811  049e  e3                	DEFB	0E3H
-   812                          ;
-   813  049f  5355              	DEFM "SU"
-   814  04a1  c2                	DEFB	'B'+80H
-   815  04a2  90                	DEFB	90H
-   816  04a3  414e              	DEFM "AN"
-   817  04a5  c4                	DEFB	'D'+80H
-   818  04a6  a0                	DEFB	0A0H
-   819  04a7  584f              	DEFM "XO"
-   820  04a9  d2                	DEFB	'R'+80H
-   821  04aa  a8                	DEFB	0A8H
-   822  04ab  4f                	DEFM "O"
-   823  04ac  d2                	DEFB	'R'+80H
-   824  04ad  b0                	DEFB	0B0H
-   825  04ae  43                	DEFM "C"
-   826  04af  d0                	DEFB	'P'+80H
-   827  04b0  b8                	DEFB	0B8H
-   828  04b1  80                	DEFB	TAND
-   829  04b2  a0                	DEFB	0A0H
-   830  04b3  84                	DEFB	TOR
-   831  04b4  b0                	DEFB	0B0H
-   832                          ;
-   833  04b5  4144              	DEFM "AD"
-   834  04b7  c4                	DEFB	'D'+80H
-   835  04b8  80                	DEFB	80H
-   836  04b9  4144              	DEFM "AD"
-   837  04bb  c3                	DEFB	'C'+80H
-   838  04bc  88                	DEFB	88H
-   839  04bd  5342              	DEFM "SB"
-   840  04bf  c3                	DEFB	'C'+80H
-   841  04c0  98                	DEFB	98H
-   842                          ;
-   843  04c1  494e              	DEFM "IN"
-   844  04c3  c3                	DEFB	'C'+80H
-   845  04c4  04                	DEFB	4
-   846  04c5  4445              	DEFM "DE"
-   847  04c7  c3                	DEFB	'C'+80H
-   848  04c8  05                	DEFB	5
-   849                          ;
-   850  04c9  49                	DEFM "I"
-   851  04ca  ce                	DEFB	'N'+80H
-   852  04cb  40                	DEFB	40H
-   853  04cc  4f55              	DEFM "OU"
-   854  04ce  d4                	DEFB	'T'+80H
-   855  04cf  41                	DEFB	41H
-   856                          ;
-   857  04d0  4a                	DEFM "J"
-   858  04d1  d2                	DEFB	'R'+80H
-   859  04d2  20                	DEFB	20H
-   860  04d3  444a4e            	DEFM "DJN"
-   861  04d6  da                	DEFB	'Z'+80H
-   862  04d7  10                	DEFB	10H
-   863                          ;
-   864  04d8  4a                	DEFM "J"
-   865  04d9  d0                	DEFB	'P'+80H
-   866  04da  c2                	DEFB	0C2H
-   867                          ;
-   868  04db  43414c            	DEFM "CAL"
-   869  04de  cc                	DEFB	'L'+80H
-   870  04df  c4                	DEFB	0C4H
-   871                          ;
-   872  04e0  5253              	DEFM "RS"
-   873  04e2  d4                	DEFB	'T'+80H
-   874  04e3  c7                	DEFB	0C7H
-   875                          ;
-   876  04e4  5245              	DEFM "RE"
-   877  04e6  d4                	DEFB	'T'+80H
-   878  04e7  c0                	DEFB	0C0H
-   879                          ;
-   880  04e8  4c                	DEFM "L"
-   881  04e9  c4                	DEFB	'D'+80H
-   882  04ea  40                	DEFB	40H
-   883                          ;
-   884  04eb  5d                	DEFB	5DH
-   885  04ec  cd                	DEFB	'M'+80H
-   886  04ed  00                	DEFB	0
-   887                          ;
-   888  04ee  5d                	DEFB	5DH
-   889  04ef  c2                	DEFB	'B'+80H
-   890  04f0  00                	DEFB	0
-   891                          ;
-   892  04f1  4f50              	DEFM "OP"
-   893  04f3  d4                	DEFB	'T'+80H
-   894  04f4  00                	DEFB	0
-   895                          ;
-   896  04f5  5d                	DEFB	5DH
-   897  04f6  d7                	DEFB	'W'+80H
-   898  04f7  00                	DEFB	0
-   899                          ;
-   900  04f8  00                	DEFB	0
-   901                          ;
-   902  04f9  c2                OPRNDS:	DEFB	'B'+80H
-   903  04fa  00                	DEFB	0
-   904  04fb  c3                	DEFB	'C'+80H
-   905  04fc  01                	DEFB	1
-   906  04fd  c4                	DEFB	'D'+80H
-   907  04fe  02                	DEFB	2
-   908  04ff  c5                	DEFB	'E'+80H
-   909  0500  03                	DEFB	3
-   910  0501  c8                	DEFB	'H'+80H
-   911  0502  04                	DEFB	4
-   912  0503  cc                	DEFB	'L'+80H
-   913  0504  05                	DEFB	5
-   914  0505  2848              	DEFM "(H"
-   915  0507  cc                	DEFB	'L'+80H
-   916  0508  06                	DEFB	6
-   917  0509  c1                	DEFB	'A'+80H
-   918  050a  07                	DEFB	7
-   919  050b  2849              	DEFM "(I"
-   920  050d  d8                	DEFB	'X'+80H
-   921  050e  86                	DEFB	86H
-   922  050f  2849              	DEFM "(I"
-   923  0511  d9                	DEFB	'Y'+80H
-   924  0512  c6                	DEFB	0C6H
-   925                          ;
-   926  0513  42                	DEFM "B"
-   927  0514  c3                	DEFB	'C'+80H
-   928  0515  08                	DEFB	8
-   929  0516  44                	DEFM "D"
-   930  0517  c5                	DEFB	'E'+80H
-   931  0518  0a                	DEFB	10
-   932  0519  48                	DEFM "H"
-   933  051a  cc                	DEFB	'L'+80H
-   934  051b  0c                	DEFB	12
-   935  051c  49                	DEFM "I"
-   936  051d  d8                	DEFB	'X'+80H
-   937  051e  8c                	DEFB	8CH
-   938  051f  49                	DEFM "I"
-   939  0520  d9                	DEFB	'Y'+80H
-   940  0521  cc                	DEFB	0CCH
-   941  0522  41                	DEFM "A"
-   942  0523  c6                	DEFB	'F'+80H
-   943  0524  0e                	DEFB	14
-   944  0525  53                	DEFM "S"
-   945  0526  d0                	DEFB	'P'+80H
-   946  0527  0e                	DEFB	14
-   947                          ;
-   948  0528  4e                	DEFM "N"
-   949  0529  da                	DEFB	'Z'+80H
-   950  052a  10                	DEFB	16
-   951  052b  da                	DEFB	'Z'+80H
-   952  052c  11                	DEFB	17
-   953  052d  4e                	DEFM "N"
-   954  052e  c3                	DEFB	'C'+80H
-   955  052f  12                	DEFB	18
-   956  0530  50                	DEFM "P"
-   957  0531  cf                	DEFB	'O'+80H
-   958  0532  14                	DEFB	20
-   959  0533  50                	DEFM "P"
-   960  0534  c5                	DEFB	'E'+80H
-   961  0535  15                	DEFB	21
-   962  0536  d0                	DEFB	'P'+80H
-   963  0537  16                	DEFB	22
-   964  0538  cd                	DEFB	'M'+80H
-   965  0539  17                	DEFB	23
-   966                          ;
-   967  053a  28                	DEFM "("
-   968  053b  c3                	DEFB	'C'+80H
-   969  053c  20                	DEFB	20H
-   970                          ;
-   971  053d  00                	DEFB	0
-   972                          ;
-   973  053e  49                LDOPS:	DEFM "I"
-   974  053f  00                	DEFB	0
-   975  0540  c1                	DEFB	'A'+80H
-   976  0541  47                	DEFB	47H
-   977  0542  52                	DEFM "R"
-   978  0543  00                	DEFB	0
-   979  0544  c1                	DEFB	'A'+80H
-   980  0545  4f                	DEFB	4FH
-   981  0546  41                	DEFM "A"
-   982  0547  00                	DEFB	0
-   983  0548  c9                	DEFB	'I'+80H
-   984  0549  57                	DEFB	57H
-   985  054a  41                	DEFM "A"
-   986  054b  00                	DEFB	0
-   987  054c  d2                	DEFB	'R'+80H
-   988  054d  5f                	DEFB	5FH
-   989  054e  284243            	DEFM "(BC"
-   990  0551  00                	DEFB	0
-   991  0552  c1                	DEFB	'A'+80H
-   992  0553  02                	DEFB	2
-   993  0554  284445            	DEFM "(DE"
-   994  0557  00                	DEFB	0
-   995  0558  c1                	DEFB	'A'+80H
-   996  0559  12                	DEFB	12H
-   997  055a  41                	DEFM "A"
-   998  055b  00                	DEFB	0
-   999  055c  2842              	DEFM "(B"
-  1000  055e  c3                	DEFB	'C'+80H
-  1001  055f  0a                	DEFB	0AH
-  1002  0560  41                	DEFM "A"
-  1003  0561  00                	DEFB	0
-  1004  0562  2844              	DEFM "(D"
-  1005  0564  c5                	DEFB	'E'+80H
-  1006  0565  1a                	DEFB	1AH
-  1007                          ;
-  1008  0566  00                	DEFB	0
-  1009                          ;
-  1010                          FIN: ; END
-  1011                          
+     2                          ;
+     3                          ;BBC BASIC INTERPRETER - Z80 VERSION
+     4                          ;Z80 CPU ASSEMBLER MODULE - "ASMB"
+     5                          ;(C) COPYRIGHT R.T.RUSSELL 1981-2024
+     6                          ;
+     7                          ;THE NAME BBC BASIC IS USED WITH THE PERMISSION
+     8                          ;OF THE BRITISH BROADCASTING CORPORATION AND IS
+     9                          ;NOT TRANSFERRABLE TO A FORKED OR DERIVED WORK.
+    10                          ;
+    11                          ;VERSION 5.0, 14-05-2024
+    12                          ;
+    13                          	PUBLIC ASSEM
+    14                          ;
+    15                          	EXTERN TABIT
+    16                          	EXTERN CRLF
+    17                          	EXTERN OUT
+    18                          	EXTERN VAR
+    19                          	EXTERN ZERO
+    20                          	EXTERN STOREN
+    21                          	EXTERN ERROR
+    22                          	EXTERN EXPRI
+    23                          	EXTERN EXPRS
+    24                          ;
+    25                          	EXTERN LISTON
+    26                          	EXTERN COUNT
+    27                          	EXTERN ACCS
+    28                          	EXTERN OC
+    29                          	EXTERN PC
+    30                          ;
+    31                          CR	EQU	0DH
+    32                          TAND	EQU	80H
+    33                          TOR	EQU	84H
+    34                          TERROR	EQU	85H
+    35                          TCALL	EQU	0D6H
+    36                          TDEF	EQU	0DDH
+    37                          ;
+    38                          ;ASSEMBLER:
+    39                          ;LANGUAGE-INDEPENDENT CONTROL SECTION:
+    40                          ; Outputs: A=delimiter, carry set if syntax error.
+    41                          ;
+    42  0000  cd8803            ASSEM:	CALL	SKIP
+    43  0003  fd23              	INC	IY
+    44  0005  fe3a              	CP	':'
+    45  0007  28f7              	JR	Z,ASSEM
+    46  0009  fe5d              	CP	']'
+    47  000b  c8                	RET	Z
+    48  000c  fe0d              	CP	CR
+    49  000e  c8                	RET	Z
+    50  000f  fd2b              	DEC	IY
+    51  0011  dd2a0000          	LD	IX,(PC)		;PROGRAM COUNTER
+    52  0015  210000            	LD	HL,LISTON
+    53  0018  cb76              	BIT	6,(HL)
+    54  001a  2804              	JR	Z,ASSEM0
+    55  001c  dd2a0000          	LD	IX,(OC)		;ORIGIN of CODE
+    56  0020  dde5              ASSEM0:	PUSH	IX
+    57  0022  fde5              	PUSH	IY
+    58  0024  cdb400            	CALL	ASMB
+    59  0027  c1                	POP	BC
+    60  0028  d1                	POP	DE
+    61  0029  d8                	RET	C
+    62  002a  cd8803            	CALL	SKIP
+    63  002d  37                	SCF
+    64  002e  c0                	RET	NZ
+    65  002f  fd2b              	DEC	IY
+    66  0031  fd23              ASSEM3:	INC	IY
+    67  0033  fd7e00            	LD	A,(IY)
+    68  0036  cdac03            	CALL	TERM0
+    69  0039  20f6              	JR	NZ,ASSEM3
+    70  003b  3a0000            	LD	A,(LISTON)
+    71  003e  dde5              	PUSH	IX
+    72  0040  e1                	POP	HL
+    73  0041  b7                	OR	A
+    74  0042  ed52              	SBC	HL,DE
+    75  0044  eb                	EX	DE,HL		;DE= NO. OF BYTES
+    76  0045  e5                	PUSH	HL
+    77  0046  2a0000            	LD	HL,(PC)
+    78  0049  e5                	PUSH	HL
+    79  004a  19                	ADD	HL,DE
+    80  004b  220000            	LD	(PC),HL		;UPDATE PC
+    81  004e  cb77              	BIT	6,A
+    82  0050  2807              	JR	Z,ASSEM5
+    83  0052  2a0000            	LD	HL,(OC)
+    84  0055  19                	ADD	HL,DE
+    85  0056  220000            	LD	(OC),HL		;UPDATE OC
+    86  0059  e1                ASSEM5:	POP	HL		;OLD PC
+    87  005a  dde1              	POP	IX		;CODE HERE
+    88  005c  cb67              	BIT	4,A
+    89  005e  28a0              	JR	Z,ASSEM
+    90  0060  7c                	LD	A,H
+    91  0061  cda000            	CALL	HEX
+    92  0064  7d                	LD	A,L
+    93  0065  cd9900            	CALL	HEXSP
+    94  0068  af                	XOR	A
+    95  0069  bb                	CP	E
+    96  006a  2815              	JR	Z,ASSEM2
+    97  006c  3a0000            ASSEM1:	LD	A,(COUNT)
+    98  006f  fe11              	CP	17
+    99  0071  3e05              	LD	A,5
+   100  0073  d40000            	CALL	NC,TABIT	;NEXT LINE
+   101  0076  dd7e00            	LD	A,(IX)
+   102  0079  cd9900            	CALL	HEXSP
+   103  007c  dd23              	INC	IX
+   104  007e  1d                	DEC	E
+   105  007f  20eb              	JR	NZ,ASSEM1
+   106  0081  3e12              ASSEM2:	LD	A,18
+   107  0083  cd0000            	CALL	TABIT
+   108  0086  fde5              	PUSH	IY
+   109  0088  e1                	POP	HL
+   110  0089  ed42              	SBC	HL,BC
+   111  008b  0a                ASSEM4:	LD	A,(BC)
+   112  008c  cd0000            	CALL	OUT
+   113  008f  03                	INC	BC
+   114  0090  2d                	DEC	L
+   115  0091  20f8              	JR	NZ,ASSEM4
+   116  0093  cd0000            	CALL	CRLF
+   117  0096  c30000            	JP	ASSEM
+   118                          ;
+   119  0099  cda000            HEXSP:	CALL	HEX
+   120  009c  3e20              	LD	A,' '
+   121  009e  1811              	JR	OUTCH1
+   122  00a0  f5                HEX:	PUSH	AF
+   123  00a1  0f                	RRCA
+   124  00a2  0f                	RRCA
+   125  00a3  0f                	RRCA
+   126  00a4  0f                	RRCA
+   127  00a5  cda900            	CALL	HEXOUT
+   128  00a8  f1                	POP	AF
+   129  00a9  e60f              HEXOUT:	AND	0FH
+   130  00ab  c690              	ADD	A,90H
+   131  00ad  27                	DAA
+   132  00ae  ce40              	ADC	A,40H
+   133  00b0  27                	DAA
+   134  00b1  c30000            OUTCH1:	JP	OUT
+   135                          ;
+   136                          ;PROCESSOR-SPECIFIC TRANSLATION SECTION:
+   137                          ;
+   138                          ;REGISTER USAGE: B - TYPE OF MOST RECENT OPERAND
+   139                          ;                C - OPCODE BEING BUILT
+   140                          ;                D - (IX) OR (IY) FLAG
+   141                          ;                E - OFFSET FROM IX OR IY
+   142                          ;               HL - NUMERIC OPERAND VALUE
+   143                          ;               IX - CODE DESTINATION
+   144                          ;               IY - SOURCE TEXT POINTER
+   145                          ;   Inputs: A = initial character
+   146                          ;  Outputs: Carry set if syntax error.
+   147                          ;
+   148  00b4  fe2e              ASMB:	CP	'.'
+   149  00b6  2028              	JR	NZ,ASMB1
+   150  00b8  fd23              	INC	IY
+   151  00ba  dde5              	PUSH	IX
+   152  00bc  cd0000            	CALL	VAR
+   153  00bf  f5                	PUSH	AF
+   154  00c0  cd0000            	CALL	ZERO
+   155  00c3  d9                	EXX
+   156  00c4  2a0000            	LD	HL,(PC)
+   157  00c7  d9                	EXX
+   158  00c8  3a0000            	LD	A,(LISTON)
+   159  00cb  e620              	AND	20H
+   160  00cd  200b              	JR	NZ,ASMB0
+   161  00cf  dd7e00            	LD	A,(IX)
+   162  00d2  ddb601            	OR	(IX+1)
+   163  00d5  3e03              	LD	A,3
+   164  00d7  c20000            	JP	NZ,ERROR	;Multiple label
+   165  00da  f1                ASMB0:	POP	AF
+   166  00db  cd0000            	CALL	STOREN
+   167  00de  dde1              	POP	IX
+   168  00e0  cd8803            ASMB1:	CALL	SKIP
+   169  00e3  c8                	RET	Z
+   170  00e4  fed6              	CP	TCALL
+   171  00e6  0ec4              	LD	C,0C4H
+   172  00e8  fd23              	INC	IY
+   173  00ea  cad701            	JP	Z,GRPC
+   174  00ed  fd2b              	DEC	IY
+   175  00ef  21b203            	LD	HL,OPCODS
+   176  00f2  cd3f03            	CALL	FIND
+   177  00f5  d8                	RET	C
+   178  00f6  48                	LD	C,B	;ROOT OPCODE
+   179  00f7  1600              	LD	D,0	;CLEAR IX/IY FLAG
+   180                          ;
+   181                          ;GROUP 0 - TRIVIAL CASES REQUIRING NO COMPUTATION
+   182                          ;GROUP 1 - AS GROUP 0 BUT WITH "ED" PREFIX
+   183                          ;
+   184  00f9  d627              	SUB	39
+   185  00fb  3007              	JR	NC,GROUP2
+   186  00fd  fee8              	CP	15-39
+   187  00ff  d4a502            	CALL	NC,ED
+   188  0102  1868              	JR	BYTE0
+   189                          ;
+   190                          ;GROUP 2 - BIT, RES, SET
+   191                          ;GROUP 3 - RLC, RRC, RL, RR, SLA, SRA, SRL
+   192                          ;
+   193  0104  d60a              GROUP2:	SUB	10
+   194  0106  300f              	JR	NC,GROUP4
+   195  0108  fef9              	CP	3-10
+   196  010a  dc2f03            	CALL	C,BIT
+   197  010d  d8                	RET	C
+   198  010e  cd0403            	CALL	REGLO
+   199  0111  d8                	RET	C
+   200  0112  cda902            	CALL	CB
+   201  0115  1855              	JR	BYTE0
+   202                          ;
+   203                          ;GROUP 4 - PUSH, POP, EX (SP)
+   204                          ;
+   205  0117  d603              GROUP4:	SUB	3
+   206  0119  3006              	JR	NC,GROUP5
+   207  011b  cd2303            G4:	CALL	PAIR
+   208  011e  d8                	RET	C
+   209  011f  184b              	JR	BYTE0
+   210                          ;
+   211                          ;GROUP 5 - SUB, AND, XOR, OR, CP
+   212                          ;GROUP 6 - ADD, ADC, SBC
+   213                          ;
+   214  0121  d60a              GROUP5:	SUB	8+2
+   215  0123  3032              	JR	NC,GROUP7
+   216  0125  fefd              	CP	5-8
+   217  0127  0607              	LD	B,7
+   218  0129  d4b702            	CALL	NC,OPND
+   219  012c  78                	LD	A,B
+   220  012d  fe07              	CP	7
+   221  012f  2010              	JR	NZ,G6HL
+   222  0131  cd0403            G6:	CALL	REGLO
+   223  0134  79                	LD	A,C
+   224  0135  3028              	JR	NC,BIND1
+   225  0137  ee46              	XOR	46H
+   226  0139  cdab02            	CALL	BIND
+   227  013c  cde702            DB:	CALL	NUMBER
+   228  013f  1878              	JR	VAL8
+   229                          ;
+   230  0141  e63f              G6HL:	AND	3FH
+   231  0143  fe0c              	CP	12
+   232  0145  37                	SCF
+   233  0146  c0                	RET	NZ
+   234  0147  79                	LD	A,C
+   235  0148  fe80              	CP	80H
+   236  014a  0e09              	LD	C,9
+   237  014c  28cd              	JR	Z,G4
+   238  014e  ee1c              	XOR	1CH
+   239  0150  0f                	RRCA
+   240  0151  4f                	LD	C,A
+   241  0152  cda502            	CALL	ED
+   242  0155  18c4              	JR	G4
+   243                          ;
+   244                          ;GROUP 7 - INC, DEC
+   245                          ;
+   246  0157  d602              GROUP7:	SUB	2
+   247  0159  3014              	JR	NC,GROUP8
+   248  015b  cd0a03            	CALL	REGHI
+   249  015e  79                	LD	A,C
+   250  015f  d2ab02            BIND1:	JP	NC,BIND
+   251  0162  ee64              	XOR	64H
+   252  0164  07                	RLCA
+   253  0165  07                	RLCA
+   254  0166  07                	RLCA
+   255  0167  4f                	LD	C,A
+   256  0168  cd2703            	CALL	PAIR1
+   257  016b  d8                	RET	C
+   258  016c  79                BYTE0:	LD	A,C
+   259  016d  187f              	JR	BYTE2
+   260                          ;
+   261                          ;GROUP 8 - IN
+   262                          ;GROUP 9 - OUT
+   263                          ;
+   264  016f  d602              GROUP8:	SUB	2
+   265  0171  3021              	JR	NC,GROUPA
+   266  0173  feff              	CP	1-2
+   267  0175  cc9a02            	CALL	Z,CORN
+   268  0178  08                	EX	AF,AF'
+   269  0179  cd0a03            	CALL	REGHI
+   270  017c  d8                	RET	C
+   271  017d  08                	EX	AF,AF'
+   272  017e  dc9a02            	CALL	C,CORN
+   273  0181  24                	INC	H
+   274  0182  28e8              	JR	Z,BYTE0
+   275  0184  78                	LD	A,B
+   276  0185  fe07              	CP	7
+   277  0187  37                	SCF
+   278  0188  c0                	RET	NZ
+   279  0189  79                	LD	A,C
+   280  018a  ee03              	XOR	3
+   281  018c  07                	RLCA
+   282  018d  07                	RLCA
+   283  018e  07                	RLCA
+   284  018f  cdd702            	CALL	BYTE
+   285  0192  1825              	JR	VAL8
+   286                          ;
+   287                          ;GROUP 10 - JR, DJNZ
+   288                          ;
+   289  0194  d602              GROUPA:	SUB	2
+   290  0196  3024              	JR	NC,GROUPB
+   291  0198  feff              	CP	1-2
+   292  019a  c41003            	CALL	NZ,COND
+   293  019d  79                	LD	A,C
+   294  019e  3002              	JR	NC,GRPA
+   295  01a0  3e18              	LD	A,18H
+   296  01a2  cdd702            GRPA:	CALL	BYTE
+   297  01a5  cde702            	CALL	NUMBER
+   298  01a8  ed5b0000          	LD	DE,(PC)
+   299  01ac  13                	INC	DE
+   300  01ad  37                	SCF
+   301  01ae  ed52              	SBC	HL,DE
+   302  01b0  7d                	LD	A,L
+   303  01b1  17                	RLA
+   304  01b2  9f                	SBC	A,A
+   305  01b3  bc                	CP	H
+   306  01b4  3e01              TOOFAR:	LD	A,1
+   307  01b6  c20000            	JP	NZ,ERROR	;"Out of range"
+   308  01b9  7d                VAL8:	LD	A,L
+   309  01ba  1832              	JR	BYTE2
+   310                          ;
+   311                          ;GROUP 11 - JP
+   312                          ;
+   313  01bc  47                GROUPB:	LD	B,A
+   314  01bd  2016              	JR	NZ,GROUPC
+   315  01bf  cd1003            	CALL	COND
+   316  01c2  79                	LD	A,C
+   317  01c3  300b              	JR	NC,GRPB
+   318  01c5  78                	LD	A,B
+   319  01c6  e63f              	AND	3FH
+   320  01c8  fe06              	CP	6
+   321  01ca  3ee9              	LD	A,0E9H
+   322  01cc  2820              	JR	Z,BYTE2
+   323  01ce  3ec3              	LD	A,0C3H
+   324  01d0  cdd702            GRPB:	CALL	BYTE
+   325  01d3  1805              	JR	ADDR
+   326                          ;
+   327                          ;GROUP 12 - CALL
+   328                          ;
+   329  01d5  100c              GROUPC:	DJNZ	GROUPD
+   330  01d7  cdf201            GRPC:	CALL	GRPE
+   331  01da  cde702            ADDR:	CALL	NUMBER
+   332  01dd  cdb901            VAL16:	CALL	VAL8
+   333  01e0  7c                	LD	A,H
+   334  01e1  180b              	JR	BYTE2
+   335                          ;
+   336                          ;GROUP 13 - RST
+   337                          ;
+   338  01e3  100b              GROUPD:	DJNZ	GROUPE
+   339  01e5  cde702            	CALL	NUMBER
+   340  01e8  a1                	AND	C
+   341  01e9  b4                	OR	H
+   342  01ea  20c8              	JR	NZ,TOOFAR
+   343  01ec  7d                	LD	A,L
+   344  01ed  b1                	OR	C
+   345  01ee  1878              BYTE2:	JR	BYTE1
+   346                          ;
+   347                          ;GROUP 14 - RET
+   348                          ;
+   349  01f0  100a              GROUPE:	DJNZ	GROUPF
+   350  01f2  cd1003            GRPE:	CALL	COND
+   351  01f5  79                	LD	A,C
+   352  01f6  3070              	JR	NC,BYTE1
+   353  01f8  f609              	OR	9
+   354  01fa  186c              	JR	BYTE1
+   355                          ;
+   356                          ;GROUP 15 - LD
+   357                          ;
+   358  01fc  106c              GROUPF:	DJNZ	MISC
+   359  01fe  cd3c03            	CALL	LDOP
+   360  0201  305f              	JR	NC,LDA
+   361  0203  cd0a03            	CALL	REGHI
+   362  0206  08                	EX	AF,AF'
+   363  0207  cd8803            	CALL	SKIP
+   364  020a  fe28              	CP	'('
+   365  020c  281d              	JR	Z,LDIN
+   366  020e  08                	EX	AF,AF'
+   367  020f  d23101            	JP	NC,G6
+   368  0212  0e01              	LD	C,1
+   369  0214  cd2703            	CALL	PAIR1
+   370  0217  d8                	RET	C
+   371  0218  3e0e              	LD	A,14
+   372  021a  b8                	CP	B
+   373  021b  47                	LD	B,A
+   374  021c  cc2303            	CALL	Z,PAIR
+   375  021f  78                	LD	A,B
+   376  0220  e63f              	AND	3FH
+   377  0222  fe0c              	CP	12
+   378  0224  79                	LD	A,C
+   379  0225  20a9              	JR	NZ,GRPB
+   380  0227  3ef9              	LD	A,0F9H
+   381  0229  183d              	JR	BYTE1
+   382                          ;
+   383  022b  08                LDIN:	EX	AF,AF'
+   384  022c  c5                	PUSH	BC
+   385  022d  d40403            	CALL	NC,REGLO
+   386  0230  79                	LD	A,C
+   387  0231  c1                	POP	BC
+   388  0232  3077              	JR	NC,BIND
+   389  0234  0e0a              	LD	C,0AH
+   390  0236  cd2703            	CALL	PAIR1
+   391  0239  cd8102            	CALL	LD16
+   392  023c  3092              	JR	NC,GRPB
+   393  023e  cde702            	CALL	NUMBER
+   394  0241  0e02              	LD	C,2
+   395  0243  cd2303            	CALL	PAIR
+   396  0246  cd8102            	CALL	LD16
+   397  0249  d8                	RET	C
+   398  024a  cdd702            	CALL	BYTE
+   399  024d  188e              	JR	VAL16
+   400                          ;
+   401                          ;OPT - SET OPTION
+   402                          ;
+   403  024f  05                OPT:	DEC	B
+   404  0250  ca3c01            	JP	Z,DB
+   405  0253  1085              	DJNZ	ADDR
+   406  0255  cde702            	CALL	NUMBER
+   407  0258  210000            	LD	HL,LISTON
+   408  025b  4f                	LD	C,A
+   409  025c  ed6f              	RLD
+   410  025e  79                	LD	A,C
+   411  025f  ed67              	RRD
+   412  0261  c9                	RET
+   413                          ;
+   414  0262  fe04              LDA:	CP	4
+   415  0264  dca502            	CALL	C,ED
+   416  0267  78                	LD	A,B
+   417  0268  186d              BYTE1:	JR	BYTE
+   418                          ;
+   419                          ;MISC - DEFB, DEFW, DEFM
+   420                          ;
+   421  026a  10e3              MISC:	DJNZ	OPT
+   422  026c  dde5              	PUSH	IX
+   423  026e  cd0000            	CALL	EXPRS
+   424  0271  dde1              	POP	IX
+   425  0273  210000            	LD	HL,ACCS
+   426  0276  af                DEFM1:	XOR	A
+   427  0277  bb                	CP	E
+   428  0278  c8                	RET	Z
+   429  0279  7e                	LD	A,(HL)
+   430  027a  23                	INC	HL
+   431  027b  cdd702            	CALL	BYTE
+   432  027e  1d                	DEC	E
+   433  027f  18f5              	JR	DEFM1
+   434                          ;
+   435                          ;SUBROUTINES:
+   436                          ;
+   437  0281  78                LD16:	LD	A,B
+   438  0282  380e              	JR	C,LD8
+   439  0284  78                	LD	A,B
+   440  0285  e63f              	AND	3FH
+   441  0287  fe0c              	CP	12
+   442  0289  79                	LD	A,C
+   443  028a  c8                	RET	Z
+   444  028b  cda502            	CALL	ED
+   445  028e  79                	LD	A,C
+   446  028f  f643              	OR	43H
+   447  0291  c9                	RET
+   448                          ;
+   449  0292  fe07              LD8:	CP	7
+   450  0294  37                	SCF
+   451  0295  c0                	RET	NZ
+   452  0296  79                	LD	A,C
+   453  0297  f630              	OR	30H
+   454  0299  c9                	RET
+   455                          ;
+   456  029a  c5                CORN:	PUSH	BC
+   457  029b  cdb702            	CALL	OPND
+   458  029e  cb68              	BIT	5,B
+   459  02a0  c1                	POP	BC
+   460  02a1  2844              	JR	Z,NUMBER
+   461  02a3  26ff              	LD	H,-1
+   462  02a5  3eed              ED:	LD	A,0EDH
+   463  02a7  182e              	JR	BYTE
+   464                          ;
+   465  02a9  3ecb              CB:	LD	A,0CBH
+   466  02ab  fe76              BIND:	CP	76H
+   467  02ad  37                	SCF
+   468  02ae  c8                	RET	Z		;REJECT LD (HL),(HL)
+   469  02af  cdd702            	CALL	BYTE
+   470  02b2  14                	INC	D
+   471  02b3  f0                	RET	P
+   472  02b4  7b                	LD	A,E
+   473  02b5  1820              	JR	BYTE
+   474                          ;
+   475  02b7  e5                OPND:	PUSH	HL
+   476  02b8  21f904            	LD	HL,OPRNDS
+   477  02bb  cd3f03            	CALL	FIND
+   478  02be  e1                	POP	HL
+   479  02bf  d8                	RET	C
+   480  02c0  cb78              	BIT	7,B
+   481  02c2  c8                	RET	Z
+   482  02c3  cb58              	BIT	3,B
+   483  02c5  e5                	PUSH	HL
+   484  02c6  ccde02            	CALL	Z,OFFSET
+   485  02c9  5d                	LD	E,L
+   486  02ca  e1                	POP	HL
+   487  02cb  3edd              	LD	A,0DDH
+   488  02cd  cb70              	BIT	6,B
+   489  02cf  2802              	JR	Z,OP1
+   490  02d1  3efd              	LD	A,0FDH
+   491  02d3  b7                OP1:	OR	A
+   492  02d4  14                	INC	D
+   493  02d5  57                	LD	D,A
+   494  02d6  f8                	RET	M
+   495  02d7  dd7700            BYTE:	LD	(IX),A
+   496  02da  dd23              	INC	IX
+   497  02dc  b7                	OR	A
+   498  02dd  c9                	RET
+   499                          ;
+   500  02de  fd7e00            OFFSET:	LD	A,(IY)
+   501  02e1  fe29              	CP	')'
+   502  02e3  210000            	LD	HL,0
+   503  02e6  c8                	RET	Z
+   504  02e7  cd8803            NUMBER:	CALL	SKIP
+   505  02ea  c5                	PUSH	BC
+   506  02eb  d5                	PUSH	DE
+   507  02ec  dde5              	PUSH	IX
+   508  02ee  cd0000            	CALL	EXPRI
+   509  02f1  dde1              	POP	IX
+   510  02f3  d9                	EXX
+   511  02f4  d1                	POP	DE
+   512  02f5  c1                	POP	BC
+   513  02f6  7d                	LD	A,L
+   514  02f7  b7                	OR	A
+   515  02f8  c9                	RET
+   516                          ;
+   517  02f9  cdb702            REG:	CALL	OPND
+   518  02fc  d8                	RET	C
+   519  02fd  78                	LD	A,B
+   520  02fe  e63f              	AND	3FH
+   521  0300  fe08              	CP	8
+   522  0302  3f                	CCF
+   523  0303  c9                	RET
+   524                          ;
+   525  0304  cdf902            REGLO:	CALL	REG
+   526  0307  d8                	RET	C
+   527  0308  182f              	JR	ORC
+   528                          ;
+   529  030a  cdf902            REGHI:	CALL	REG
+   530  030d  d8                	RET	C
+   531  030e  1826              	JR	SHL3
+   532                          ;
+   533  0310  cdb702            COND:	CALL	OPND
+   534  0313  d8                	RET	C
+   535  0314  78                	LD	A,B
+   536  0315  e61f              	AND	1FH
+   537  0317  d610              	SUB	16
+   538  0319  301b              	JR	NC,SHL3
+   539  031b  fef1              	CP	-15
+   540  031d  37                	SCF
+   541  031e  c0                	RET	NZ
+   542  031f  3e03              	LD	A,3
+   543  0321  1813              	JR	SHL3
+   544                          ;
+   545  0323  cdb702            PAIR:	CALL	OPND
+   546  0326  d8                	RET	C
+   547  0327  78                PAIR1:	LD	A,B
+   548  0328  e60f              	AND	0FH
+   549  032a  d608              	SUB	8
+   550  032c  d8                	RET	C
+   551  032d  1807              	JR	SHL3
+   552                          ;
+   553  032f  cde702            BIT:	CALL	NUMBER
+   554  0332  fe08              	CP	8
+   555  0334  3f                	CCF
+   556  0335  d8                	RET	C
+   557  0336  07                SHL3:	RLCA
+   558  0337  07                	RLCA
+   559  0338  07                	RLCA
+   560  0339  b1                ORC:	OR	C
+   561  033a  4f                	LD	C,A
+   562  033b  c9                	RET
+   563                          ;
+   564  033c  213e05            LDOP:	LD	HL,LDOPS
+   565  033f  cd8803            FIND:	CALL	SKIP
+   566  0342  0600              EXIT:	LD	B,0
+   567  0344  37                	SCF
+   568  0345  c8                	RET	Z
+   569  0346  fedd              	CP	TDEF
+   570  0348  2804              	JR	Z,FIND0
+   571  034a  fe85              	CP	TOR+1
+   572  034c  3f                	CCF
+   573  034d  d8                	RET	C
+   574  034e  7e                FIND0:	LD	A,(HL)
+   575  034f  b7                	OR	A
+   576  0350  28f0              	JR	Z,EXIT
+   577  0352  fdae00            	XOR	(IY)
+   578  0355  e65f              	AND	01011111B
+   579  0357  2809              	JR	Z,FIND2
+   580  0359  cb7e              FIND1:	BIT	7,(HL)
+   581  035b  23                	INC	HL
+   582  035c  28fb              	JR	Z,FIND1
+   583  035e  23                	INC	HL
+   584  035f  04                	INC	B
+   585  0360  18ec              	JR	FIND0
+   586                          ;
+   587  0362  fde5              FIND2:	PUSH	IY
+   588  0364  cb7e              FIND3:	BIT	7,(HL)
+   589  0366  fd23              	INC	IY
+   590  0368  23                	INC	HL
+   591  0369  2010              	JR	NZ,FIND5
+   592  036b  be                	CP	(HL)
+   593  036c  cc8703            	CALL	Z,SKIP0
+   594  036f  7e                	LD	A,(HL)
+   595  0370  fdae00            	XOR	(IY)
+   596  0373  e65f              	AND	01011111B
+   597  0375  28ed              	JR	Z,FIND3
+   598  0377  fde1              FIND4:	POP	IY
+   599  0379  18de              	JR	FIND1
+   600                          ;
+   601  037b  cd9a03            FIND5:	CALL	DELIM
+   602  037e  c49403            	CALL	NZ,SIGN
+   603  0381  20f4              	JR	NZ,FIND4
+   604  0383  78                FIND6:	LD	A,B
+   605  0384  46                	LD	B,(HL)
+   606  0385  e1                	POP	HL
+   607  0386  c9                	RET
+   608                          ;
+   609  0387  23                SKIP0:	INC	HL
+   610  0388  cd9a03            SKIP:	CALL	DELIM
+   611  038b  c0                	RET	NZ
+   612  038c  cda603            	CALL	TERM
+   613  038f  c8                	RET	Z
+   614  0390  fd23              	INC	IY
+   615  0392  18f4              	JR	SKIP
+   616                          ;
+   617  0394  fe2b              SIGN:	CP	'+'
+   618  0396  c8                	RET	Z
+   619  0397  fe2d              	CP	'-'
+   620  0399  c9                	RET
+   621                          ;
+   622  039a  fd7e00            DELIM:	LD	A,(IY)		;ASSEMBLER DELIMITER
+   623  039d  fe20              	CP	' '
+   624  039f  c8                	RET	Z
+   625  03a0  fe2c              	CP	','
+   626  03a2  c8                	RET	Z
+   627  03a3  fe29              	CP	')'
+   628  03a5  c8                	RET	Z
+   629  03a6  fe3b              TERM:	CP	';'		;ASSEMBLER TERMINATOR
+   630  03a8  c8                	RET	Z
+   631  03a9  fe5c              	CP	5CH
+   632  03ab  c8                	RET	Z
+   633  03ac  fe3a              TERM0:	CP	':'		;ASSEMBLER SEPARATOR
+   634  03ae  d0                	RET	NC
+   635  03af  fe0d              	CP	CR
+   636  03b1  c9                	RET
+   637                          ;
+   638  03b2  4e4f              OPCODS:	DEFM "NO"
+   639  03b4  d0                	DEFB	'P'+80H
+   640  03b5  00                	DEFB	0
+   641  03b6  524c43            	DEFM "RLC"
+   642  03b9  c1                	DEFB	'A'+80H
+   643  03ba  07                	DEFB	7
+   644  03bb  4558              	DEFM "EX"
+   645  03bd  00                	DEFB	0
+   646  03be  4146              	DEFM "AF"
+   647  03c0  00                	DEFB	0
+   648  03c1  4146              	DEFM "AF"
+   649  03c3  a7                	DEFB	27H+80H
+   650  03c4  08                	DEFB	8
+   651  03c5  525243            	DEFM "RRC"
+   652  03c8  c1                	DEFB	'A'+80H
+   653  03c9  0f                	DEFB	0FH
+   654  03ca  524c              	DEFM "RL"
+   655  03cc  c1                	DEFB	'A'+80H
+   656  03cd  17                	DEFB	17H
+   657  03ce  5252              	DEFM "RR"
+   658  03d0  c1                	DEFB	'A'+80H
+   659  03d1  1f                	DEFB	1FH
+   660  03d2  4441              	DEFM "DA"
+   661  03d4  c1                	DEFB	'A'+80H
+   662  03d5  27                	DEFB	27H
+   663  03d6  4350              	DEFM "CP"
+   664  03d8  cc                	DEFB	'L'+80H
+   665  03d9  2f                	DEFB	2FH
+   666  03da  5343              	DEFM "SC"
+   667  03dc  c6                	DEFB	'F'+80H
+   668  03dd  37                	DEFB	37H
+   669  03de  4343              	DEFM "CC"
+   670  03e0  c6                	DEFB	'F'+80H
+   671  03e1  3f                	DEFB	3FH
+   672  03e2  48414c            	DEFM "HAL"
+   673  03e5  d4                	DEFB	'T'+80H
+   674  03e6  76                	DEFB	76H
+   675  03e7  4558              	DEFM "EX"
+   676  03e9  d8                	DEFB	'X'+80H
+   677  03ea  d9                	DEFB	0D9H
+   678  03eb  4558              	DEFM "EX"
+   679  03ed  00                	DEFB	0
+   680  03ee  4445              	DEFM "DE"
+   681  03f0  00                	DEFB	0
+   682  03f1  48                	DEFM "H"
+   683  03f2  cc                	DEFB	'L'+80H
+   684  03f3  eb                	DEFB	0EBH
+   685  03f4  44                	DEFM "D"
+   686  03f5  c9                	DEFB	'I'+80H
+   687  03f6  f3                	DEFB	0F3H
+   688  03f7  45                	DEFM "E"
+   689  03f8  c9                	DEFB	'I'+80H
+   690  03f9  fb                	DEFB	0FBH
+   691                          ;
+   692  03fa  4e45              	DEFM "NE"
+   693  03fc  c7                	DEFB	'G'+80H
+   694  03fd  44                	DEFB	44H
+   695  03fe  494d              	DEFM "IM"
+   696  0400  00                	DEFB	0
+   697  0401  b0                	DEFB	'0'+80H
+   698  0402  46                	DEFB	46H
+   699  0403  524554            	DEFM "RET"
+   700  0406  ce                	DEFB	'N'+80H
+   701  0407  45                	DEFB	45H
+   702  0408  524554            	DEFM "RET"
+   703  040b  c9                	DEFB	'I'+80H
+   704  040c  4d                	DEFB	4DH
+   705  040d  494d              	DEFM "IM"
+   706  040f  00                	DEFB	0
+   707  0410  b1                	DEFB	'1'+80H
+   708  0411  56                	DEFB	56H
+   709  0412  494d              	DEFM "IM"
+   710  0414  00                	DEFB	0
+   711  0415  b2                	DEFB	'2'+80H
+   712  0416  5e                	DEFB	5EH
+   713  0417  5252              	DEFM "RR"
+   714  0419  c4                	DEFB	'D'+80H
+   715  041a  67                	DEFB	67H
+   716  041b  524c              	DEFM "RL"
+   717  041d  c4                	DEFB	'D'+80H
+   718  041e  6f                	DEFB	6FH
+   719  041f  4c44              	DEFM "LD"
+   720  0421  c9                	DEFB	'I'+80H
+   721  0422  a0                	DEFB	0A0H
+   722  0423  4350              	DEFM "CP"
+   723  0425  c9                	DEFB	'I'+80H
+   724  0426  a1                	DEFB	0A1H
+   725  0427  494e              	DEFM "IN"
+   726  0429  c9                	DEFB	'I'+80H
+   727  042a  a2                	DEFB	0A2H
+   728  042b  4f5554            	DEFM "OUT"
+   729  042e  c9                	DEFB	'I'+80H
+   730  042f  a3                	DEFB	0A3H
+   731  0430  4c44              	DEFM "LD"
+   732  0432  c4                	DEFB	'D'+80H
+   733  0433  a8                	DEFB	0A8H
+   734  0434  4350              	DEFM "CP"
+   735  0436  c4                	DEFB	'D'+80H
+   736  0437  a9                	DEFB	0A9H
+   737  0438  494e              	DEFM "IN"
+   738  043a  c4                	DEFB	'D'+80H
+   739  043b  aa                	DEFB	0AAH
+   740  043c  4f5554            	DEFM "OUT"
+   741  043f  c4                	DEFB	'D'+80H
+   742  0440  ab                	DEFB	0ABH
+   743  0441  4c4449            	DEFM "LDI"
+   744  0444  d2                	DEFB	'R'+80H
+   745  0445  b0                	DEFB	0B0H
+   746  0446  435049            	DEFM "CPI"
+   747  0449  d2                	DEFB	'R'+80H
+   748  044a  b1                	DEFB	0B1H
+   749  044b  494e49            	DEFM "INI"
+   750  044e  d2                	DEFB	'R'+80H
+   751  044f  b2                	DEFB	0B2H
+   752  0450  4f5449            	DEFM "OTI"
+   753  0453  d2                	DEFB	'R'+80H
+   754  0454  b3                	DEFB	0B3H
+   755  0455  4c4444            	DEFM "LDD"
+   756  0458  d2                	DEFB	'R'+80H
+   757  0459  b8                	DEFB	0B8H
+   758  045a  435044            	DEFM "CPD"
+   759  045d  d2                	DEFB	'R'+80H
+   760  045e  b9                	DEFB	0B9H
+   761  045f  494e44            	DEFM "IND"
+   762  0462  d2                	DEFB	'R'+80H
+   763  0463  ba                	DEFB	0BAH
+   764  0464  4f5444            	DEFM "OTD"
+   765  0467  d2                	DEFB	'R'+80H
+   766  0468  bb                	DEFB	0BBH
+   767                          ;
+   768  0469  4249              	DEFM "BI"
+   769  046b  d4                	DEFB	'T'+80H
+   770  046c  40                	DEFB	40H
+   771  046d  5245              	DEFM "RE"
+   772  046f  d3                	DEFB	'S'+80H
+   773  0470  80                	DEFB	80H
+   774  0471  5345              	DEFM "SE"
+   775  0473  d4                	DEFB	'T'+80H
+   776  0474  c0                	DEFB	0C0H
+   777                          ;
+   778  0475  524c              	DEFM "RL"
+   779  0477  c3                	DEFB	'C'+80H
+   780  0478  00                	DEFB	0
+   781  0479  5252              	DEFM "RR"
+   782  047b  c3                	DEFB	'C'+80H
+   783  047c  08                	DEFB	8
+   784  047d  52                	DEFM "R"
+   785  047e  cc                	DEFB	'L'+80H
+   786  047f  10                	DEFB	10H
+   787  0480  52                	DEFM "R"
+   788  0481  d2                	DEFB	'R'+80H
+   789  0482  18                	DEFB	18H
+   790  0483  534c              	DEFM "SL"
+   791  0485  c1                	DEFB	'A'+80H
+   792  0486  20                	DEFB	20H
+   793  0487  5352              	DEFM "SR"
+   794  0489  c1                	DEFB	'A'+80H
+   795  048a  28                	DEFB	28H
+   796  048b  5352              	DEFM "SR"
+   797  048d  cc                	DEFB	'L'+80H
+   798  048e  38                	DEFB	38H
+   799                          ;
+   800  048f  504f              	DEFM "PO"
+   801  0491  d0                	DEFB	'P'+80H
+   802  0492  c1                	DEFB	0C1H
+   803  0493  505553            	DEFM "PUS"
+   804  0496  c8                	DEFB	'H'+80H
+   805  0497  c5                	DEFB	0C5H
+   806  0498  4558              	DEFM "EX"
+   807  049a  00                	DEFB	0
+   808  049b  2853              	DEFM "(S"
+   809  049d  d0                	DEFB	'P'+80H
+   810  049e  e3                	DEFB	0E3H
+   811                          ;
+   812  049f  5355              	DEFM "SU"
+   813  04a1  c2                	DEFB	'B'+80H
+   814  04a2  90                	DEFB	90H
+   815  04a3  414e              	DEFM "AN"
+   816  04a5  c4                	DEFB	'D'+80H
+   817  04a6  a0                	DEFB	0A0H
+   818  04a7  584f              	DEFM "XO"
+   819  04a9  d2                	DEFB	'R'+80H
+   820  04aa  a8                	DEFB	0A8H
+   821  04ab  4f                	DEFM "O"
+   822  04ac  d2                	DEFB	'R'+80H
+   823  04ad  b0                	DEFB	0B0H
+   824  04ae  43                	DEFM "C"
+   825  04af  d0                	DEFB	'P'+80H
+   826  04b0  b8                	DEFB	0B8H
+   827  04b1  80                	DEFB	TAND
+   828  04b2  a0                	DEFB	0A0H
+   829  04b3  84                	DEFB	TOR
+   830  04b4  b0                	DEFB	0B0H
+   831                          ;
+   832  04b5  4144              	DEFM "AD"
+   833  04b7  c4                	DEFB	'D'+80H
+   834  04b8  80                	DEFB	80H
+   835  04b9  4144              	DEFM "AD"
+   836  04bb  c3                	DEFB	'C'+80H
+   837  04bc  88                	DEFB	88H
+   838  04bd  5342              	DEFM "SB"
+   839  04bf  c3                	DEFB	'C'+80H
+   840  04c0  98                	DEFB	98H
+   841                          ;
+   842  04c1  494e              	DEFM "IN"
+   843  04c3  c3                	DEFB	'C'+80H
+   844  04c4  04                	DEFB	4
+   845  04c5  4445              	DEFM "DE"
+   846  04c7  c3                	DEFB	'C'+80H
+   847  04c8  05                	DEFB	5
+   848                          ;
+   849  04c9  49                	DEFM "I"
+   850  04ca  ce                	DEFB	'N'+80H
+   851  04cb  40                	DEFB	40H
+   852  04cc  4f55              	DEFM "OU"
+   853  04ce  d4                	DEFB	'T'+80H
+   854  04cf  41                	DEFB	41H
+   855                          ;
+   856  04d0  4a                	DEFM "J"
+   857  04d1  d2                	DEFB	'R'+80H
+   858  04d2  20                	DEFB	20H
+   859  04d3  444a4e            	DEFM "DJN"
+   860  04d6  da                	DEFB	'Z'+80H
+   861  04d7  10                	DEFB	10H
+   862                          ;
+   863  04d8  4a                	DEFM "J"
+   864  04d9  d0                	DEFB	'P'+80H
+   865  04da  c2                	DEFB	0C2H
+   866                          ;
+   867  04db  43414c            	DEFM "CAL"
+   868  04de  cc                	DEFB	'L'+80H
+   869  04df  c4                	DEFB	0C4H
+   870                          ;
+   871  04e0  5253              	DEFM "RS"
+   872  04e2  d4                	DEFB	'T'+80H
+   873  04e3  c7                	DEFB	0C7H
+   874                          ;
+   875  04e4  5245              	DEFM "RE"
+   876  04e6  d4                	DEFB	'T'+80H
+   877  04e7  c0                	DEFB	0C0H
+   878                          ;
+   879  04e8  4c                	DEFM "L"
+   880  04e9  c4                	DEFB	'D'+80H
+   881  04ea  40                	DEFB	40H
+   882                          ;
+   883  04eb  5d                	DEFB	5DH
+   884  04ec  cd                	DEFB	'M'+80H
+   885  04ed  00                	DEFB	0
+   886                          ;
+   887  04ee  5d                	DEFB	5DH
+   888  04ef  c2                	DEFB	'B'+80H
+   889  04f0  00                	DEFB	0
+   890                          ;
+   891  04f1  4f50              	DEFM "OP"
+   892  04f3  d4                	DEFB	'T'+80H
+   893  04f4  00                	DEFB	0
+   894                          ;
+   895  04f5  5d                	DEFB	5DH
+   896  04f6  d7                	DEFB	'W'+80H
+   897  04f7  00                	DEFB	0
+   898                          ;
+   899  04f8  00                	DEFB	0
+   900                          ;
+   901  04f9  c2                OPRNDS:	DEFB	'B'+80H
+   902  04fa  00                	DEFB	0
+   903  04fb  c3                	DEFB	'C'+80H
+   904  04fc  01                	DEFB	1
+   905  04fd  c4                	DEFB	'D'+80H
+   906  04fe  02                	DEFB	2
+   907  04ff  c5                	DEFB	'E'+80H
+   908  0500  03                	DEFB	3
+   909  0501  c8                	DEFB	'H'+80H
+   910  0502  04                	DEFB	4
+   911  0503  cc                	DEFB	'L'+80H
+   912  0504  05                	DEFB	5
+   913  0505  2848              	DEFM "(H"
+   914  0507  cc                	DEFB	'L'+80H
+   915  0508  06                	DEFB	6
+   916  0509  c1                	DEFB	'A'+80H
+   917  050a  07                	DEFB	7
+   918  050b  2849              	DEFM "(I"
+   919  050d  d8                	DEFB	'X'+80H
+   920  050e  86                	DEFB	86H
+   921  050f  2849              	DEFM "(I"
+   922  0511  d9                	DEFB	'Y'+80H
+   923  0512  c6                	DEFB	0C6H
+   924                          ;
+   925  0513  42                	DEFM "B"
+   926  0514  c3                	DEFB	'C'+80H
+   927  0515  08                	DEFB	8
+   928  0516  44                	DEFM "D"
+   929  0517  c5                	DEFB	'E'+80H
+   930  0518  0a                	DEFB	10
+   931  0519  48                	DEFM "H"
+   932  051a  cc                	DEFB	'L'+80H
+   933  051b  0c                	DEFB	12
+   934  051c  49                	DEFM "I"
+   935  051d  d8                	DEFB	'X'+80H
+   936  051e  8c                	DEFB	8CH
+   937  051f  49                	DEFM "I"
+   938  0520  d9                	DEFB	'Y'+80H
+   939  0521  cc                	DEFB	0CCH
+   940  0522  41                	DEFM "A"
+   941  0523  c6                	DEFB	'F'+80H
+   942  0524  0e                	DEFB	14
+   943  0525  53                	DEFM "S"
+   944  0526  d0                	DEFB	'P'+80H
+   945  0527  0e                	DEFB	14
+   946                          ;
+   947  0528  4e                	DEFM "N"
+   948  0529  da                	DEFB	'Z'+80H
+   949  052a  10                	DEFB	16
+   950  052b  da                	DEFB	'Z'+80H
+   951  052c  11                	DEFB	17
+   952  052d  4e                	DEFM "N"
+   953  052e  c3                	DEFB	'C'+80H
+   954  052f  12                	DEFB	18
+   955  0530  50                	DEFM "P"
+   956  0531  cf                	DEFB	'O'+80H
+   957  0532  14                	DEFB	20
+   958  0533  50                	DEFM "P"
+   959  0534  c5                	DEFB	'E'+80H
+   960  0535  15                	DEFB	21
+   961  0536  d0                	DEFB	'P'+80H
+   962  0537  16                	DEFB	22
+   963  0538  cd                	DEFB	'M'+80H
+   964  0539  17                	DEFB	23
+   965                          ;
+   966  053a  28                	DEFM "("
+   967  053b  c3                	DEFB	'C'+80H
+   968  053c  20                	DEFB	20H
+   969                          ;
+   970  053d  00                	DEFB	0
+   971                          ;
+   972  053e  49                LDOPS:	DEFM "I"
+   973  053f  00                	DEFB	0
+   974  0540  c1                	DEFB	'A'+80H
+   975  0541  47                	DEFB	47H
+   976  0542  52                	DEFM "R"
+   977  0543  00                	DEFB	0
+   978  0544  c1                	DEFB	'A'+80H
+   979  0545  4f                	DEFB	4FH
+   980  0546  41                	DEFM "A"
+   981  0547  00                	DEFB	0
+   982  0548  c9                	DEFB	'I'+80H
+   983  0549  57                	DEFB	57H
+   984  054a  41                	DEFM "A"
+   985  054b  00                	DEFB	0
+   986  054c  d2                	DEFB	'R'+80H
+   987  054d  5f                	DEFB	5FH
+   988  054e  284243            	DEFM "(BC"
+   989  0551  00                	DEFB	0
+   990  0552  c1                	DEFB	'A'+80H
+   991  0553  02                	DEFB	2
+   992  0554  284445            	DEFM "(DE"
+   993  0557  00                	DEFB	0
+   994  0558  c1                	DEFB	'A'+80H
+   995  0559  12                	DEFB	12H
+   996  055a  41                	DEFM "A"
+   997  055b  00                	DEFB	0
+   998  055c  2842              	DEFM "(B"
+   999  055e  c3                	DEFB	'C'+80H
+  1000  055f  0a                	DEFB	0AH
+  1001  0560  41                	DEFM "A"
+  1002  0561  00                	DEFB	0
+  1003  0562  2844              	DEFM "(D"
+  1004  0564  c5                	DEFB	'E'+80H
+  1005  0565  1a                	DEFB	1AH
+  1006                          ;
+  1007  0566  00                	DEFB	0
+  1008                          ;
+  1009                          FIN: ; END
+  1010                          

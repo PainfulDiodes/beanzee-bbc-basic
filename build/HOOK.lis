@@ -1,147 +1,69 @@
 HOOK.asm:
      1                          ;
-     2                          	INCLUDE "constants.inc"
-constants.inc:
-     1                          ; BBC BASIC Z80 - Shared Constants
-     2                          ; Extracted from source modules to avoid duplicate definitions
-     3                          
-     4                          ; ASCII control characters
-     5                          LF      EQU     0AH
-     6                          CR      EQU     0DH
-     7                          ; Note: ESC conflicts with label in AMOS.Z80, not included
-     8                          BEL     EQU     7
-     9                          BS      EQU     8
-    10                          HT      EQU     9
-    11                          VT      EQU     0BH
-    12                          ; Note: DEL conflicts with label in MAIN.Z80, not included
-    13                          
-    14                          ; CP/M system addresses
-    15                          ; Note: BDOS conflicts with label in DIST.Z80, not included
-    16                          FCB     EQU     5CH
-    17                          DSKBUF  EQU     80H
-    18                          FCBSIZ  EQU     128+36+2
-    19                          
-    20                          ; Token values
-    21                          TAND    EQU     80H
-    22                          TOR     EQU     84H
-    23                          TBY     EQU     0FH
-    24                          TERROR  EQU     85H
-    25                          TLINE   EQU     86H
-    26                          TOFF    EQU     87H
-    27                          TSTEP   EQU     88H
-    28                          TSPC    EQU     89H
-    29                          TTAB    EQU     8AH
-    30                          TELSE   EQU     8BH
-    31                          TTHEN   EQU     8CH
-    32                          TLINO   EQU     8DH
-    33                          TTO     EQU     0B8H
-    34                          TCASE   EQU     0C8H
-    35                          TWHILE  EQU     0C7H
-    36                          TWHEN   EQU     0C9H
-    37                          TOF     EQU     0CAH
-    38                          TENDCASE EQU    0CBH
-    39                          TOTHERWISE EQU  0CCH
-    40                          TENDIF  EQU     0CDH
-    41                          TENDWHILE EQU   0CEH
-    42                          TCALL   EQU     0D6H
-    43                          TDATA   EQU     0DCH
-    44                          TDEF    EQU     0DDH
-    45                          TDIM    EQU     0DEH
-    46                          TEND    EQU     0E0H
-    47                          TFOR    EQU     0E3H
-    48                          TGOSUB  EQU     0E4H
-    49                          TGOTO   EQU     0E5H
-    50                          TIF     EQU     0E7H
-    51                          TLOCAL  EQU     0EAH
-    52                          TMODE   EQU     0EBH
-    53                          TNEXT   EQU     0EDH
-    54                          TON     EQU     0EEH
-    55                          TPROC   EQU     0F2H
-    56                          TREM    EQU     0F4H
-    57                          TREPEAT EQU     0F5H
-    58                          TREPORT EQU     0F6H
-    59                          TRESTORE EQU    0F7H
-    60                          TRETURN EQU     0F8H
-    61                          TSTOP   EQU     0FAH
-    62                          TTRACE  EQU     0FCH
-    63                          TUNTIL  EQU     0FDH
-    64                          TWIDTH  EQU     0FEH
-    65                          TEXIT   EQU     10H
-    66                          
-    67                          ; Error codes
-    68                          BADOP   EQU     1
-    69                          DIVBY0  EQU     18
-    70                          ; Note: TOOBIG conflicts with label in MAIN.Z80, not included
-    71                          NGROOT  EQU     21
-    72                          LOGRNG  EQU     22
-    73                          ACLOST  EQU     23
-    74                          EXPRNG  EQU     24
-    75                          
-HOOK.asm:
-     3                          	PUBLIC CLG
-     4                          	PUBLIC COLOUR
-     5                          	PUBLIC DRAW
-     6                          	PUBLIC ENVEL
-     7                          	PUBLIC GCOL
-     8                          	PUBLIC MODE
-     9                          	PUBLIC MOVE
-    10                          	PUBLIC PLOT
-    11                          	PUBLIC SOUND
-    12                          	PUBLIC PUTIMS
-    13                          	PUBLIC CIRCLE
-    14                          	PUBLIC ELLIPS
-    15                          	PUBLIC FILL
-    16                          	PUBLIC MOUSE
-    17                          	PUBLIC ORIGIN
-    18                          	PUBLIC RECTAN
-    19                          	PUBLIC LINE
-    20                          	PUBLIC TINT
-    21                          	PUBLIC WAIT
-    22                          	PUBLIC SYS
-    23                          	PUBLIC CSRON
-    24                          	PUBLIC CSROFF
-    25                          ;
-    26                          	PUBLIC ADVAL
-    27                          	PUBLIC POINT
-    28                          	PUBLIC GETIMS
-    29                          	PUBLIC TINTFN
-    30                          	PUBLIC MODEFN
-    31                          	PUBLIC WIDFN
-    32                          ;
-    33                          	EXTERN EXTERR
-    34                          ;
-    35                          CLG:
-    36                          COLOUR:
-    37                          DRAW:
-    38                          ENVEL:
-    39                          GCOL:
-    40                          MODE:
-    41                          MOVE:
-    42                          PLOT:
-    43                          SOUND:
-    44                          ADVAL:
-    45                          POINT:
-    46                          GETIMS:
-    47                          PUTIMS:
-    48                          CIRCLE:
-    49                          ELLIPS:
-    50                          FILL:
-    51                          MOUSE:
-    52                          ORIGIN:
-    53                          RECTAN:
-    54                          LINE:
-    55                          TINT:
-    56                          TINTFN:
-    57                          MODEFN:
-    58                          WIDFN:
-    59                          WAIT:
-    60                          SYS:
-    61                          CSRON:
-    62                          CSROFF:
-    63  0000  af                	XOR	A
-    64  0001  cd0000            	CALL	EXTERR
-    65  0004  536f727279        	DEFM "Sorry"
-    66  0009  00                	DEFB	0
-    67                          ;
-    68                          	; END
-    69                          
+     2                          	PUBLIC CLG
+     3                          	PUBLIC COLOUR
+     4                          	PUBLIC DRAW
+     5                          	PUBLIC ENVEL
+     6                          	PUBLIC GCOL
+     7                          	PUBLIC MODE
+     8                          	PUBLIC MOVE
+     9                          	PUBLIC PLOT
+    10                          	PUBLIC SOUND
+    11                          	PUBLIC PUTIMS
+    12                          	PUBLIC CIRCLE
+    13                          	PUBLIC ELLIPS
+    14                          	PUBLIC FILL
+    15                          	PUBLIC MOUSE
+    16                          	PUBLIC ORIGIN
+    17                          	PUBLIC RECTAN
+    18                          	PUBLIC LINE
+    19                          	PUBLIC TINT
+    20                          	PUBLIC WAIT
+    21                          	PUBLIC SYS
+    22                          	PUBLIC CSRON
+    23                          	PUBLIC CSROFF
+    24                          ;
+    25                          	PUBLIC ADVAL
+    26                          	PUBLIC POINT
+    27                          	PUBLIC GETIMS
+    28                          	PUBLIC TINTFN
+    29                          	PUBLIC MODEFN
+    30                          	PUBLIC WIDFN
+    31                          ;
+    32                          	EXTERN EXTERR
+    33                          ;
+    34                          CLG:
+    35                          COLOUR:
+    36                          DRAW:
+    37                          ENVEL:
+    38                          GCOL:
+    39                          MODE:
+    40                          MOVE:
+    41                          PLOT:
+    42                          SOUND:
+    43                          ADVAL:
+    44                          POINT:
+    45                          GETIMS:
+    46                          PUTIMS:
+    47                          CIRCLE:
+    48                          ELLIPS:
+    49                          FILL:
+    50                          MOUSE:
+    51                          ORIGIN:
+    52                          RECTAN:
+    53                          LINE:
+    54                          TINT:
+    55                          TINTFN:
+    56                          MODEFN:
+    57                          WIDFN:
+    58                          WAIT:
+    59                          SYS:
+    60                          CSRON:
+    61                          CSROFF:
+    62  0000  af                	XOR	A
+    63  0001  cd0000            	CALL	EXTERR
+    64  0004  536f727279        	DEFM "Sorry"
+    65  0009  00                	DEFB	0
+    66                          ;
+    67                          	; END
+    68                          

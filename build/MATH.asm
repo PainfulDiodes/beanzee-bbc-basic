@@ -1,5 +1,4 @@
 	; TITLE '(C) COPYRIGHT R.T.RUSSELL 1986-2025'
-	INCLUDE "constants.inc"
 ;
 ;Z80 FLOATING POINT PACKAGE
 ;(C) COPYRIGHT  R.T.RUSSELL  1986-2024
@@ -25,13 +24,13 @@
 ;
 ;Error codes:
 ;
-; BADOP EQU	1		;Bad operation code
-; DIVBY0 EQU	18		;Division by zero
+BADOP	EQU	1		;Bad operation code
+DIVBY0	EQU	18		;Division by zero
 TOOBIG	EQU	20		;Too big
-; NGROOT EQU	21		;Negative root
-; LOGRNG EQU	22		;Log range
-; ACLOST EQU	23		;Accuracy lost
-; EXPRNG EQU	24		;Exp range
+NGROOT	EQU	21		;Negative root
+LOGRNG	EQU	22		;Log range
+ACLOST	EQU	23		;Accuracy lost
+EXPRNG	EQU	24		;Exp range
 ;
 	PUBLIC FPP
 	EXTERN STORE5
