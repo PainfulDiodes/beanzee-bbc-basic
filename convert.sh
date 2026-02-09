@@ -3,7 +3,8 @@
 # Translate CP/M assembler directives to z88dk syntax
 # Usage: ./convert.sh
 #
-# Copies .Z80 files from src/ to build/ with .asm extension, converting:
+# Copies .Z80 files from src/ to per-target build directories with .asm
+# extension, converting:
 #   GLOBAL -> PUBLIC (for modular linking)
 #   EXTRN  -> EXTERN (for modular linking)
 #   TITLE  -> ; TITLE (commented out)
@@ -23,24 +24,29 @@
 set -e
 
 SRC_DIR="src"
-BUILD_DIR="build"
+
+# Target definitions: directory and module list
+CPM_DIR="build/cpm"
+CPM_MODULES="DIST MAIN EXEC EVAL ASMB MATH HOOK CMOS DATA"
+
+ACORN_DIR="build/acorn"
+ACORN_MODULES="MAIN EXEC EVAL ASMB MATH ACORN AMOS DATA"
 
 echo "Translating CP/M directives to z88dk syntax"
 echo "============================================"
 
-# Create build directory for converted files
-mkdir -p "$BUILD_DIR"
+mkdir -p "$CPM_DIR" "$ACORN_DIR"
 
-# Process each .Z80 file
-for file in "$SRC_DIR"/*.Z80; do
-    filename=$(basename "$file" .Z80)
-    echo "Processing $filename..."
+# Convert a source file and write to target directory
+convert_module() {
+    local src_file="$1"
+    local dest_file="$2"
 
-    # Copy original to build directory with .asm extension
-    cp "$file" "$BUILD_DIR/$filename.asm"
+    cp "$src_file" "$dest_file"
 
-    # Apply transformations to asm file
+    # Apply transformations
     # Note: Using temp file for portability (BSD sed vs GNU sed)
+    local temp_file
     temp_file=$(mktemp)
 
     sed \
@@ -77,39 +83,68 @@ for file in "$SRC_DIR"/*.Z80; do
         -e "s/'\*' AND 0FH/0AH/g" \
         -e "s/'\\\\'/5CH/g" \
         -e "s/TDEF AND 7FH/5DH/g" \
-        "$BUILD_DIR/$filename.asm" > "$temp_file"
+        "$dest_file" > "$temp_file"
 
-    mv "$temp_file" "$BUILD_DIR/$filename.asm"
+    mv "$temp_file" "$dest_file"
+}
+
+# Check if a module is in a space-separated list
+has_module() {
+    local module="$1"
+    local list="$2"
+    for m in $list; do
+        if [ "$m" = "$module" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Process each .Z80 file, placing it in the appropriate target directories
+for file in "$SRC_DIR"/*.Z80; do
+    filename=$(basename "$file" .Z80)
+
+    if has_module "$filename" "$CPM_MODULES"; then
+        echo "  $filename -> $CPM_DIR/$filename.asm"
+        convert_module "$file" "$CPM_DIR/$filename.asm"
+    fi
+
+    if has_module "$filename" "$ACORN_MODULES"; then
+        echo "  $filename -> $ACORN_DIR/$filename.asm"
+        convert_module "$file" "$ACORN_DIR/$filename.asm"
+    fi
 done
 
-# Post-conversion fix for DIST.asm
+# Post-conversion fix for DIST.asm (CPM only)
 # Replace ORG 1F0H with DEFS padding to reach offset 0xF0 within module
 # (DIST module linked at 0x100, so offset 0xF0 = address 0x1F0)
-if [ -f "$BUILD_DIR/DIST.asm" ]; then
+if [ -f "$CPM_DIR/DIST.asm" ]; then
     echo "Applying DIST.asm modular build fix..."
     sed -i.bak \
         -e 's/^[[:space:]]*; ORG 1F0H$/\tDEFS 0F0H - $, 0\t; Pad to offset 0xF0 (address 0x1F0 when linked at 0x100)/' \
-        "$BUILD_DIR/DIST.asm"
-    rm -f "$BUILD_DIR/DIST.asm.bak"
+        "$CPM_DIR/DIST.asm"
+    rm -f "$CPM_DIR/DIST.asm.bak"
 fi
 
 # Post-conversion fix for DATA.asm
 # Add SECTION and ORG directives so the linker places DATA at a fixed address
 # DATA_ORG is defined via -D flag at assembly time (0x4B00 for CPM, 0x4C00 for Acorn)
-if [ -f "$BUILD_DIR/DATA.asm" ]; then
-    echo "Applying DATA.asm section placement fix..."
-    temp_file=$(mktemp)
-    {
-        echo "    SECTION data"
-        echo "    ORG DATA_ORG"
-        cat "$BUILD_DIR/DATA.asm"
-    } > "$temp_file"
-    mv "$temp_file" "$BUILD_DIR/DATA.asm"
-fi
+for target_dir in "$CPM_DIR" "$ACORN_DIR"; do
+    if [ -f "$target_dir/DATA.asm" ]; then
+        echo "Applying $target_dir/DATA.asm section placement fix..."
+        temp_file=$(mktemp)
+        {
+            echo "    SECTION data"
+            echo "    ORG DATA_ORG"
+            cat "$target_dir/DATA.asm"
+        } > "$temp_file"
+        mv "$temp_file" "$target_dir/DATA.asm"
+    fi
+done
 
 echo ""
 echo "Translation complete."
-echo "Converted files saved to: $BUILD_DIR/"
+echo "Converted files saved to: $CPM_DIR/ and $ACORN_DIR/"
 
 # Create hex dumps of reference binaries
 echo ""
@@ -122,4 +157,5 @@ for target_dir in bin/cpm bin/acorn; do
 done
 
 echo ""
-echo "To build: build/build.sh [cpm|acorn]"
+echo "To build: build/cpm/build.sh   (CP/M target)"
+echo "          build/acorn/build.sh (Acorn tube target)"
