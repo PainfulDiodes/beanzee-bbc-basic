@@ -10,12 +10,23 @@ set -e
 cd "$(dirname "$0")"
 
 count=0
-for pattern in *.o *.bin *.map *.lis; do
+for pattern in *.o *.lis; do
     for file in $pattern; do
         if [ -f "$file" ]; then
             rm -f "$file"
             count=$((count + 1))
         fi
+    done
+done
+
+for target_dir in cpm acorn; do
+    for pattern in "$target_dir"/*.bin "$target_dir"/*.hex "$target_dir"/*.map; do
+        for file in $pattern; do
+            if [ -f "$file" ]; then
+                rm -f "$file"
+                count=$((count + 1))
+            fi
+        done
     done
 done
 
