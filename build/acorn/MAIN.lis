@@ -1,0 +1,2261 @@
+MAIN.asm:
+     1                          	; TITLE BBC BASIC (C) R.T.RUSSELL 1981-2025
+     2                          ;
+     3                          ;BBC BASIC INTERPRETER - Z80 VERSION
+     4                          ;COMMANDS AND COMMON MODULE - "MAIN"
+     5                          ;(C) COPYRIGHT R.T.RUSSELL 1981-2025
+     6                          ;
+     7                          ;THE NAME BBC BASIC IS USED WITH THE PERMISSION
+     8                          ;OF THE BRITISH BROADCASTING CORPORATION AND IS
+     9                          ;NOT TRANSFERRABLE TO A FORKED OR DERIVED WORK.
+    10                          ;
+    11                          ;VERSION 2.3, 07-05-1984
+    12                          ;VERSION 3.0, 01-03-1987
+    13                          ;VERSION 5.0, 31-05-2024
+    14                          ;VERSION 5.1, 10-08-2024
+    15                          ;VERSION 5.2, 16-02-2025
+    16                          ;
+    17                          	EXTERN XEQ
+    18                          	EXTERN RUN0
+    19                          	EXTERN CHAIN0
+    20                          	EXTERN TERMQ
+    21                          	EXTERN MUL16
+    22                          	EXTERN X14OR5
+    23                          	EXTERN SPACES
+    24                          	EXTERN ESCAPE
+    25                          	EXTERN CHECK
+    26                          	EXTERN SEARCH
+    27                          ;
+    28                          	EXTERN OSWRCH
+    29                          	EXTERN OSLINE
+    30                          	EXTERN OSINIT
+    31                          	EXTERN OSLOAD
+    32                          	EXTERN OSSAVE
+    33                          	EXTERN OSBGET
+    34                          	EXTERN OSBPUT
+    35                          	EXTERN OSSHUT
+    36                          	EXTERN OSSTAT
+    37                          	EXTERN PROMPT
+    38                          	EXTERN LTRAP
+    39                          	EXTERN OSCLI
+    40                          	EXTERN RESET
+    41                          ;
+    42                          	EXTERN COMMA
+    43                          	EXTERN BRAKET
+    44                          	EXTERN ZERO
+    45                          	EXTERN ITEMI
+    46                          	EXTERN EXPRI
+    47                          	EXTERN EXPRS
+    48                          	EXTERN DECODE
+    49                          	EXTERN LOADN
+    50                          	EXTERN SFIX
+    51                          ;
+    52                          	PUBLIC NXT
+    53                          	PUBLIC NLIST
+    54                          	PUBLIC START
+    55                          	PUBLIC OUTCHR
+    56                          	PUBLIC OUT
+    57                          	PUBLIC ERROR
+    58                          	PUBLIC EXTERR
+    59                          	PUBLIC REPORT
+    60                          	PUBLIC CLOOP
+    61                          	PUBLIC WARM
+    62                          	PUBLIC CLEAR
+    63                          	PUBLIC CRLF
+    64                          	PUBLIC SAYLN
+    65                          	PUBLIC LOAD0
+    66                          	PUBLIC TELL
+    67                          	PUBLIC FINDL
+    68                          	PUBLIC GETTOP
+    69                          	PUBLIC SETLIN
+    70                          	PUBLIC GETVAR
+    71                          	PUBLIC PUTVAR
+    72                          	PUBLIC GETDEF
+    73                          	PUBLIC LOCATE
+    74                          	PUBLIC CREATE
+    75                          	PUBLIC PBCDL
+    76                          	PUBLIC LEXAN2
+    77                          	PUBLIC RANGE
+    78                          	PUBLIC VERMSG
+    79                          	PUBLIC KEYWDS
+    80                          	PUBLIC KEYWDL
+    81                          ;
+    82                          	EXTERN PAGE
+    83                          	EXTERN ACCS
+    84                          	EXTERN BUFFER
+    85                          	EXTERN LOMEM
+    86                          	EXTERN HIMEM
+    87                          	EXTERN COUNT
+    88                          	EXTERN WIDTH
+    89                          	EXTERN FREE
+    90                          	EXTERN STAVAR
+    91                          	EXTERN DYNVAR
+    92                          	EXTERN ERRTXT
+    93                          	EXTERN ERR
+    94                          	EXTERN ERL
+    95                          	EXTERN CURLIN
+    96                          	EXTERN ERRTRP
+    97                          	EXTERN ONERSP
+    98                          	EXTERN FNPTR
+    99                          	EXTERN PROPTR
+   100                          	EXTERN AUTONO
+   101                          	EXTERN INCREM
+   102                          	EXTERN LISTON
+   103                          	EXTERN TRACEN
+   104                          ;
+   105                          CR	EQU	0DH
+   106                          LF	EQU	0AH
+   107                          ESC	EQU	1BH
+   108                          ;
+   109                          TERROR	EQU	85H
+   110                          TLINE	EQU	86H
+   111                          TELSE	EQU	8BH
+   112                          TTHEN	EQU	8CH
+   113                          TLINO	EQU	8DH
+   114                          TFN	EQU	0A4H
+   115                          TTO	EQU	0B8H
+   116                          TWHILE	EQU	0C7H
+   117                          TCASE	EQU	0C8H
+   118                          TWHEN	EQU	0C9H
+   119                          TOF	EQU	0CAH
+   120                          TENDCASE EQU	0CBH
+   121                          TOTHERWISE EQU	0CCH
+   122                          TENDIF	EQU	0CDH
+   123                          TENDWHILE EQU	0CEH
+   124                          TDATA	EQU	0DCH
+   125                          TDIM	EQU	0DEH
+   126                          TFOR	EQU	0E3H
+   127                          TGOSUB	EQU	0E4H
+   128                          TGOTO	EQU	0E5H
+   129                          TIF	EQU	0E7H
+   130                          TLOCAL	EQU	0EAH
+   131                          TNEXT	EQU	0EDH
+   132                          TON	EQU	0EEH
+   133                          TPROC	EQU	0F2H
+   134                          TREM	EQU	0F4H
+   135                          TREPEAT	EQU	0F5H
+   136                          TRESTORE EQU	0F7H
+   137                          TTRACE	EQU	0FCH
+   138                          TUNTIL	EQU	0FDH
+   139                          TEXIT	EQU	10H
+   140                          ;
+   141                          TOKLO	EQU	8FH
+   142                          TOKHI	EQU	93H
+   143                          OFFSET	EQU	0CFH-TOKLO
+   144                          ;
+   145  0000  c32a00            START:	JP	COLD
+   146  0003  c39800            	JP	WARM
+   147  0006  c30000            	JP	ESCAPE
+   148  0009  c33e08            	JP	EXTERR
+   149  000c  c3e30d            	JP	TELL
+   150  000f  c3d10d            	JP	TEXT
+   151  0012  c30000            	JP	ITEMI
+   152  0015  c30000            	JP	EXPRI
+   153  0018  c30000            	JP	EXPRS
+   154  001b  c30000            	JP	OSCLI
+   155  001e  c30000            	JP	OSBGET
+   156  0021  c30000            	JP	OSBPUT
+   157  0024  c30000            	JP	OSSTAT
+   158  0027  c30000            	JP	OSSHUT
+   159  002a  210000            COLD:	LD	HL,STAVAR	;COLD START
+   160  002d  f9                	LD	SP,HL
+   161  002e  360a              	LD	(HL),10
+   162  0030  2c                	INC	L
+   163  0031  3609              	LD	(HL),9
+   164  0033  2c                	INC	L
+   165  0034  af                	XOR	A
+   166  0035  77                PURGE:	LD	(HL),A		;CLEAR SCRATCHPAD
+   167  0036  2c                	INC	L
+   168  0037  20fc              	JR	NZ,PURGE
+   169  0039  3e37              	LD	A,37H		;V3.0
+   170  003b  320000            	LD	(LISTON),A
+   171  003e  217700            	LD	HL,NOTICE
+   172  0041  220000            	LD	(ERRTXT),HL
+   173  0044  cd0000            	CALL	OSINIT
+   174  0047  ed530000          	LD	(HIMEM),DE
+   175  004b  220000            	LD	(PAGE),HL
+   176  004e  cd2709            	CALL	NEWIT
+   177  0051  c20000            	JP	NZ,CHAIN0	;AUTO-RUN
+   178  0054  cde30d            	CALL	TELL
+   179  0057  4242432042415349  VERMSG:	DEFM "BBC BASIC (Z80) Version 5.00  "
+              4320285a38302920  
+              56657273696f6e20  
+              352e30302020      
+   180  0075  0d                	DEFB	CR
+   181  0076  0a                	DEFB	LF
+   182  0077  28432920436f7079  NOTICE:	DEFM "(C) Copyright R.T.Russell 2025"
+              726967687420522e  
+              542e52757373656c  
+              6c2032303235      
+   183  0095  0d                	DEFB	CR
+   184  0096  0a                	DEFB	LF
+   185  0097  00                	DEFB	0
+   186  0098  f6                WARM:	DEFB	0F6H
+   187  0099  37                CLOOP:	SCF
+   188  009a  ed7b0000          	LD	SP,(HIMEM)
+   189  009e  cd0000            	CALL	PROMPT		;PROMPT USER
+   190  00a1  210000            	LD	HL,LISTON
+   191  00a4  7e                	LD	A,(HL)
+   192  00a5  e60f              	AND	0FH		;LISTO
+   193  00a7  f630              	OR	30H		;OPT 3
+   194  00a9  77                	LD	(HL),A
+   195  00aa  ed62              	SBC	HL,HL		;HL <- 0 (V3.0)
+   196  00ac  220000            	LD	(ERRTRP),HL
+   197  00af  220000            	LD	(ONERSP),HL
+   198  00b2  220000            	LD	(CURLIN),HL	;For CMOS EDIT->LIST
+   199  00b5  2a0000            	LD	HL,(AUTONO)
+   200  00b8  e5                	PUSH	HL
+   201  00b9  7c                	LD	A,H
+   202  00ba  b5                	OR	L
+   203  00bb  2817              	JR	Z,NOAUTO
+   204  00bd  e5                	PUSH	HL
+   205  00be  cd7f0a            	CALL	PBCD		;AUTO NUMBER
+   206  00c1  e1                	POP	HL
+   207  00c2  ed4b0000          	LD	BC,(INCREM)
+   208  00c6  0600              	LD	B,0
+   209  00c8  09                	ADD	HL,BC
+   210  00c9  da980c            	JP	C,TOOBIG
+   211  00cc  220000            	LD	(AUTONO),HL
+   212  00cf  3e20              	LD	A,' '
+   213  00d1  cdeb09            	CALL	OUTCHR
+   214  00d4  210000            NOAUTO:	LD	HL,ACCS
+   215  00d7  cd0000            	CALL	OSLINE		;GET CONSOLE INPUT
+   216  00da  af                	XOR	A
+   217  00db  320000            	LD	(COUNT),A
+   218  00de  fd210000          	LD	IY,ACCS
+   219  00e2  21ca04            	LD	HL,COMNDS
+   220  00e5  cd8f08            	CALL	LEX0
+   221  00e8  e1                	POP	HL
+   222  00e9  2019              	JR	NZ,NOTCMD
+   223  00eb  87                	ADD	A,A
+   224  00ec  4f                	LD	C,A
+   225  00ed  7c                	LD	A,H
+   226  00ee  b5                	OR	L
+   227  00ef  200f              	JR	NZ,INAUTO
+   228  00f1  47                	LD	B,A
+   229  00f2  21fa04            	LD	HL,CMDTAB
+   230  00f5  09                	ADD	HL,BC
+   231  00f6  7e                	LD	A,(HL)		;TABLE ENTRY
+   232  00f7  23                	INC	HL
+   233  00f8  66                	LD	H,(HL)
+   234  00f9  6f                	LD	L,A
+   235  00fa  fd23              	INC	IY
+   236  00fc  cdf40d            	CALL	NXT
+   237  00ff  e9                	JP	(HL)		;EXECUTE COMMAND
+   238                          ;
+   239  0100  fd210000          INAUTO:	LD	IY,ACCS
+   240  0104  7c                NOTCMD:	LD	A,H
+   241  0105  b5                	OR	L
+   242  0106  cc730c            	CALL	Z,LINNUM
+   243  0109  cdf40d            	CALL	NXT
+   244  010c  110000            	LD	DE,BUFFER
+   245  010f  0e01              	LD	C,1		;LEFT MODE
+   246  0111  e5                	PUSH	HL
+   247  0112  cd010d            	CALL	LEXAN2		;LEXICAL ANALYSIS
+   248  0115  e1                	POP	HL
+   249  0116  12                	LD	(DE),A		;TERMINATOR
+   250  0117  af                	XOR	A
+   251  0118  47                	LD	B,A
+   252  0119  4b                	LD	C,E		;BC=LINE LENGTH
+   253  011a  13                	INC	DE
+   254  011b  12                	LD	(DE),A		;ZERO NEXT
+   255  011c  7c                	LD	A,H
+   256  011d  b5                	OR	L
+   257  011e  fd210000          	LD	IY,BUFFER	;FOR XEQ
+   258  0122  ca0000            	JP	Z,XEQ		;DIRECT MODE
+   259  0125  c5                	PUSH	BC
+   260  0126  cd2c0a            	CALL	FINDL
+   261  0129  ccd208            	CALL	Z,DEL
+   262  012c  c1                	POP	BC
+   263  012d  79                	LD	A,C
+   264  012e  b7                	OR	A
+   265  012f  2839              	JR	Z,CLOOP2	;DELETE LINE ONLY
+   266  0131  c604              	ADD	A,4
+   267  0133  4f                	LD	C,A		;LENGTH INCLUSIVE
+   268  0134  d5                	PUSH	DE		;LINE NUMBER
+   269  0135  c5                	PUSH	BC		;SAVE LINE LENGTH
+   270  0136  eb                	EX	DE,HL
+   271  0137  c5                	PUSH	BC
+   272  0138  cd0e09            	CALL	GETTOP
+   273  013b  c1                	POP	BC
+   274  013c  e5                	PUSH	HL
+   275  013d  09                	ADD	HL,BC
+   276  013e  e5                	PUSH	HL
+   277  013f  24                	INC	H
+   278  0140  af                	XOR	A
+   279  0141  ed72              	SBC	HL,SP
+   280  0143  e1                	POP	HL
+   281  0144  d22d08            	JP	NC,ERROR	;"No room"
+   282  0147  e3                	EX	(SP),HL
+   283  0148  e5                	PUSH	HL
+   284  0149  23                	INC	HL
+   285  014a  b7                	OR	A
+   286  014b  ed52              	SBC	HL,DE
+   287  014d  44                	LD	B,H		;BC=AMOUNT TO MOVE
+   288  014e  4d                	LD	C,L
+   289  014f  e1                	POP	HL
+   290  0150  d1                	POP	DE
+   291  0151  2802              	JR	Z,ATEND
+   292  0153  edb8              	LDDR			;MAKE SPACE
+   293  0155  c1                ATEND:	POP	BC		;LINE LENGTH
+   294  0156  d1                	POP	DE		;LINE NUMBER
+   295  0157  23                	INC	HL
+   296  0158  71                	LD	(HL),C		;STORE LENGTH
+   297  0159  23                	INC	HL
+   298  015a  73                	LD	(HL),E		;STORE LINE NUMBER
+   299  015b  23                	INC	HL
+   300  015c  72                	LD	(HL),D
+   301  015d  23                	INC	HL
+   302  015e  110000            	LD	DE,BUFFER
+   303  0161  eb                	EX	DE,HL
+   304  0162  0d                	DEC	C
+   305  0163  0d                	DEC	C
+   306  0164  0d                	DEC	C
+   307  0165  edb0              	LDIR			;ADD LINE
+   308  0167  cd0309            	CALL	CLEAN
+   309  016a  c39900            CLOOP2:	JP	CLOOP
+   310                          ;
+   311                          ;LIST OF TOKENS AND KEYWORDS.
+   312                          ;IF A KEYWORD IS FOLLOWED BY NUL THEN IT WILL
+   313                          ; ONLY MATCH WITH THE WORD FOLLOWED IMMEDIATELY
+   314                          ; BY A DELIMITER.
+   315                          ;
+   316  016d  80                KEYWDS:	DEFB	80H
+   317  016e  414e44            	DEFM "AND"
+   318  0171  94                	DEFB	94H
+   319  0172  414253            	DEFM "ABS"
+   320  0175  95                	DEFB	95H
+   321  0176  414353            	DEFM "ACS"
+   322  0179  96                	DEFB	96H
+   323  017a  414456414c        	DEFM "ADVAL"
+   324  017f  97                	DEFB	97H
+   325  0180  415343            	DEFM "ASC"
+   326  0183  98                	DEFB	98H
+   327  0184  41534e            	DEFM "ASN"
+   328  0187  99                	DEFB	99H
+   329  0188  41544e            	DEFM "ATN"
+   330  018b  9a                	DEFB	9AH
+   331  018c  4247455420        	DEFM "BGET "
+   332  0191  d5                	DEFB	0D5H
+   333  0192  4250555420        	DEFM "BPUT "
+   334  0197  0f                	DEFB	0FH
+   335  0198  425920            	DEFM "BY "		; v5
+   336  019b  fb                	DEFB	0FBH
+   337  019c  434f4c4f5552      	DEFM "COLOUR"
+   338  01a2  fb                	DEFB	0FBH
+   339  01a3  434f4c4f52        	DEFM "COLOR"
+   340  01a8  d6                	DEFB	0D6H
+   341  01a9  43414c4c          	DEFM "CALL"
+   342  01ad  c8                	DEFB	0C8H
+   343  01ae  43415345          	DEFM "CASE"		; v5
+   344  01b2  d7                	DEFB	0D7H
+   345  01b3  434841494e        	DEFM "CHAIN"
+   346  01b8  bd                	DEFB	0BDH
+   347  01b9  43485224          	DEFM "CHR$"
+   348  01bd  d8                	DEFB	0D8H
+   349  01be  434c45415220      	DEFM "CLEAR "
+   350  01c4  d9                	DEFB	0D9H
+   351  01c5  434c4f534520      	DEFM "CLOSE "
+   352  01cb  da                	DEFB	0DAH
+   353  01cc  434c4720          	DEFM "CLG "
+   354  01d0  db                	DEFB	0DBH
+   355  01d1  434c5320          	DEFM "CLS "
+   356  01d5  9b                	DEFB	9BH
+   357  01d6  434f53            	DEFM "COS"
+   358  01d9  9c                	DEFB	9CH
+   359  01da  434f554e5420      	DEFM "COUNT "
+   360  01e0  01                	DEFB	01H
+   361  01e1  434952434c45      	DEFM "CIRCLE"	; v5
+   362  01e7  dc                	DEFB	0DCH
+   363  01e8  44415441          	DEFM "DATA"
+   364  01ec  9d                	DEFB	9DH
+   365  01ed  444547            	DEFM "DEG"
+   366  01f0  dd                	DEFB	0DDH
+   367  01f1  444546            	DEFM "DEF"
+   368  01f4  81                	DEFB	81H
+   369  01f5  444956            	DEFM "DIV"
+   370  01f8  de                	DEFB	0DEH
+   371  01f9  44494d            	DEFM "DIM"
+   372  01fc  df                	DEFB	0DFH
+   373  01fd  44524157          	DEFM "DRAW"
+   374  0201  e1                	DEFB	0E1H
+   375  0202  454e4450524f4320  	DEFM "ENDPROC "
+   376  020a  ce                	DEFB	0CEH
+   377  020b  454e445748494c45  	DEFM "ENDWHILE "	; v5
+              20                
+   378  0214  cb                	DEFB	0CBH
+   379  0215  454e444341534520  	DEFM "ENDCASE "	; v5
+   380  021d  cd                	DEFB	0CDH
+   381  021e  454e44494620      	DEFM "ENDIF "	; v5
+   382  0224  e0                	DEFB	0E0H
+   383  0225  454e4420          	DEFM "END "
+   384  0229  e2                	DEFB	0E2H
+   385  022a  454e56454c4f5045  	DEFM "ENVELOPE"
+   386  0232  8b                	DEFB	8BH
+   387  0233  454c5345          	DEFM "ELSE"
+   388  0237  a0                	DEFB	0A0H
+   389  0238  4556414c          	DEFM "EVAL"
+   390  023c  9e                	DEFB	9EH
+   391  023d  45524c20          	DEFM "ERL "
+   392  0241  85                	DEFB	85H
+   393  0242  4552524f52        	DEFM "ERROR"
+   394  0247  c5                	DEFB	0C5H
+   395  0248  454f4620          	DEFM "EOF "
+   396  024c  82                	DEFB	82H
+   397  024d  454f52            	DEFM "EOR"
+   398  0250  9f                	DEFB	9FH
+   399  0251  45525220          	DEFM "ERR "
+   400  0255  10                	DEFB	10H
+   401  0256  4558495420        	DEFM "EXIT "		; v5
+   402  025b  a1                	DEFB	0A1H
+   403  025c  455850            	DEFM "EXP"
+   404  025f  a2                	DEFB	0A2H
+   405  0260  45585420          	DEFM "EXT "
+   406  0264  02                	DEFB	02H
+   407  0265  454c4c49505345    	DEFM "ELLIPSE"	; v5
+   408  026c  e3                	DEFB	0E3H
+   409  026d  464f52            	DEFM "FOR"
+   410  0270  a3                	DEFB	0A3H
+   411  0271  46414c534520      	DEFM "FALSE "
+   412  0277  03                	DEFB	03H
+   413  0278  46494c4c          	DEFM "FILL"		; v5
+   414  027c  a4                	DEFB	0A4H
+   415  027d  464e              	DEFM "FN"
+   416  027f  e5                	DEFB	0E5H
+   417  0280  474f544f          	DEFM "GOTO"
+   418  0284  be                	DEFB	0BEH
+   419  0285  47455424          	DEFM "GET$"
+   420  0289  a5                	DEFB	0A5H
+   421  028a  474554            	DEFM "GET"
+   422  028d  e4                	DEFB	0E4H
+   423  028e  474f535542        	DEFM "GOSUB"
+   424  0293  e6                	DEFB	0E6H
+   425  0294  47434f4c          	DEFM "GCOL"
+   426  0298  93                	DEFB	93H
+   427  0299  48494d454d20      	DEFM "HIMEM "
+   428  029f  e8                	DEFB	0E8H
+   429  02a0  494e505554        	DEFM "INPUT"
+   430  02a5  e7                	DEFB	0E7H
+   431  02a6  4946              	DEFM "IF"
+   432  02a8  bf                	DEFB	0BFH
+   433  02a9  494e4b455924      	DEFM "INKEY$"
+   434  02af  a6                	DEFB	0A6H
+   435  02b0  494e4b4559        	DEFM "INKEY"
+   436  02b5  a8                	DEFB	0A8H
+   437  02b6  494e54            	DEFM "INT"
+   438  02b9  a7                	DEFB	0A7H
+   439  02ba  494e53545228      	DEFM "INSTR("
+   440  02c0  0c                	DEFB	0CH
+   441  02c1  494e5354414c4c    	DEFM "INSTALL"	; v5
+   442  02c8  86                	DEFB	86H
+   443  02c9  4c494e45          	DEFM "LINE"
+   444  02cd  92                	DEFB	92H
+   445  02ce  4c4f4d454d20      	DEFM "LOMEM "
+   446  02d4  ea                	DEFB	0EAH
+   447  02d5  4c4f43414c        	DEFM "LOCAL"
+   448  02da  c0                	DEFB	0C0H
+   449  02db  4c4546542428      	DEFM "LEFT$("
+   450  02e1  a9                	DEFB	0A9H
+   451  02e2  4c454e            	DEFM "LEN"
+   452  02e5  e9                	DEFB	0E9H
+   453  02e6  4c4554            	DEFM "LET"
+   454  02e9  ab                	DEFB	0ABH
+   455  02ea  4c4f47            	DEFM "LOG"
+   456  02ed  aa                	DEFB	0AAH
+   457  02ee  4c4e              	DEFM "LN"
+   458  02f0  c1                	DEFB	0C1H
+   459  02f1  4d49442428        	DEFM "MID$("
+   460  02f6  eb                	DEFB	0EBH
+   461  02f7  4d4f4445          	DEFM "MODE"
+   462  02fb  83                	DEFB	83H
+   463  02fc  4d4f44            	DEFM "MOD"
+   464  02ff  ec                	DEFB	0ECH
+   465  0300  4d4f5645          	DEFM "MOVE"
+   466  0304  04                	DEFB	04H
+   467  0305  4d4f555345        	DEFM "MOUSE"		; v5
+   468  030a  ed                	DEFB	0EDH
+   469  030b  4e455854          	DEFM "NEXT"
+   470  030f  ac                	DEFB	0ACH
+   471  0310  4e4f54            	DEFM "NOT"
+   472  0313  ee                	DEFB	0EEH
+   473  0314  4f4e              	DEFM "ON"
+   474  0316  87                	DEFB	87H
+   475  0317  4f464620          	DEFM "OFF "
+   476  031b  ca                	DEFB	0CAH
+   477  031c  4f4620            	DEFM "OF "		; v5
+   478  031f  05                	DEFB	05H
+   479  0320  4f524947494e      	DEFM "ORIGIN"	; v5
+   480  0326  84                	DEFB	84H
+   481  0327  4f52              	DEFM "OR"
+   482  0329  8e                	DEFB	8EH
+   483  032a  4f50454e494e      	DEFM "OPENIN"
+   484  0330  ae                	DEFB	0AEH
+   485  0331  4f50454e4f5554    	DEFM "OPENOUT"
+   486  0338  ad                	DEFB	0ADH
+   487  0339  4f50454e5550      	DEFM "OPENUP"
+   488  033f  ff                	DEFB	0FFH
+   489  0340  4f53434c49        	DEFM "OSCLI"
+   490  0345  cc                	DEFB	0CCH
+   491  0346  4f54484552574953  	DEFM "OTHERWISE"	; v5
+              45                
+   492  034f  f1                	DEFB	0F1H
+   493  0350  5052494e54        	DEFM "PRINT"
+   494  0355  90                	DEFB	90H
+   495  0356  5041474520        	DEFM "PAGE "
+   496  035b  8f                	DEFB	8FH
+   497  035c  50545220          	DEFM "PTR "
+   498  0360  af                	DEFB	0AFH
+   499  0361  504920            	DEFM "PI "
+   500  0364  f0                	DEFB	0F0H
+   501  0365  504c4f54          	DEFM "PLOT"
+   502  0369  b0                	DEFB	0B0H
+   503  036a  504f494e5428      	DEFM "POINT("
+   504  0370  f2                	DEFB	0F2H
+   505  0371  50524f43          	DEFM "PROC"
+   506  0375  b1                	DEFB	0B1H
+   507  0376  504f5320          	DEFM "POS "
+   508  037a  0e                	DEFB	0EH
+   509  037b  505554            	DEFM "PUT"		; Token changed
+   510  037e  06                	DEFB	06H
+   511  037f  5155495420        	DEFM "QUIT "		; v5
+   512  0384  f8                	DEFB	0F8H
+   513  0385  52455455524e20    	DEFM "RETURN "
+   514  038c  f5                	DEFB	0F5H
+   515  038d  524550454154      	DEFM "REPEAT"
+   516  0393  f6                	DEFB	0F6H
+   517  0394  5245504f525420    	DEFM "REPORT "
+   518  039b  f3                	DEFB	0F3H
+   519  039c  52454144          	DEFM "READ"
+   520  03a0  f4                	DEFB	0F4H
+   521  03a1  52454d            	DEFM "REM"
+   522  03a4  f9                	DEFB	0F9H
+   523  03a5  52554e20          	DEFM "RUN "
+   524  03a9  b2                	DEFB	0B2H
+   525  03aa  524144            	DEFM "RAD"
+   526  03ad  f7                	DEFB	0F7H
+   527  03ae  524553544f5245    	DEFM "RESTORE"
+   528  03b5  c2                	DEFB	0C2H
+   529  03b6  52494748542428    	DEFM "RIGHT$("
+   530  03bd  b3                	DEFB	0B3H
+   531  03be  524e4420          	DEFM "RND "
+   532  03c2  07                	DEFB	07H
+   533  03c3  52454354414e474c  	DEFM "RECTANGLE"	; v5
+              45                
+   534  03cc  88                	DEFB	88H
+   535  03cd  53544550          	DEFM "STEP"
+   536  03d1  b4                	DEFB	0B4H
+   537  03d2  53474e            	DEFM "SGN"
+   538  03d5  b5                	DEFB	0B5H
+   539  03d6  53494e            	DEFM "SIN"
+   540  03d9  b6                	DEFB	0B6H
+   541  03da  535152            	DEFM "SQR"
+   542  03dd  89                	DEFB	89H
+   543  03de  535043            	DEFM "SPC"
+   544  03e1  c3                	DEFB	0C3H
+   545  03e2  53545224          	DEFM "STR$"
+   546  03e6  c4                	DEFB	0C4H
+   547  03e7  535452494e472428  	DEFM "STRING$("
+   548  03ef  d4                	DEFB	0D4H
+   549  03f0  534f554e44        	DEFM "SOUND"
+   550  03f5  fa                	DEFB	0FAH
+   551  03f6  53544f5020        	DEFM "STOP "
+   552  03fb  c6                	DEFB	0C6H
+   553  03fc  53554d            	DEFM "SUM"		; v5
+   554  03ff  08                	DEFB	08H
+   555  0400  53574150          	DEFM "SWAP"		; v5
+   556  0404  09                	DEFB	09H
+   557  0405  535953            	DEFM "SYS"		; v5
+   558  0408  b7                	DEFB	0B7H
+   559  0409  54414e            	DEFM "TAN"
+   560  040c  8a                	DEFB	8AH
+   561  040d  54414228          	DEFM "TAB("
+   562  0411  8c                	DEFB	8CH
+   563  0412  5448454e          	DEFM "THEN"
+   564  0416  91                	DEFB	91H
+   565  0417  54494d4520        	DEFM "TIME "
+   566  041c  0a                	DEFB	0AH
+   567  041d  54494e54          	DEFM "TINT"
+   568  0421  b8                	DEFB	0B8H
+   569  0422  544f              	DEFM "TO"
+   570  0424  fc                	DEFB	0FCH
+   571  0425  5452414345        	DEFM "TRACE"
+   572  042a  b9                	DEFB	0B9H
+   573  042b  5452554520        	DEFM "TRUE "
+   574  0430  fd                	DEFB	0FDH
+   575  0431  554e54494c        	DEFM "UNTIL"
+   576  0436  ba                	DEFB	0BAH
+   577  0437  555352            	DEFM "USR"
+   578  043a  ef                	DEFB	0EFH
+   579  043b  564455            	DEFM "VDU"
+   580  043e  bb                	DEFB	0BBH
+   581  043f  56414c            	DEFM "VAL"
+   582  0442  bc                	DEFB	0BCH
+   583  0443  56504f5320        	DEFM "VPOS "
+   584  0448  c7                	DEFB	0C7H
+   585  0449  5748494c45        	DEFM "WHILE"		; v5
+   586  044e  c9                	DEFB	0C9H
+   587  044f  5748454e          	DEFM "WHEN"		; v5
+   588  0453  0b                	DEFB	0BH
+   589  0454  5741495420        	DEFM "WAIT "		; v5
+   590  0459  fe                	DEFB	0FEH
+   591  045a  5749445448        	DEFM "WIDTH"
+   592                          ;'LEFT' TOKENS:
+   593  045f  cf                	DEFB	0CFH
+   594  0460  505452            	DEFM "PTR"
+   595  0463  d1                	DEFB	0D1H
+   596  0464  54494d45          	DEFM "TIME"
+   597  0468  d3                	DEFB	0D3H
+   598  0469  48494d454d        	DEFM "HIMEM"
+   599  046e  d2                	DEFB	0D2H
+   600  046f  4c4f4d454d        	DEFM "LOMEM"
+   601  0474  d0                	DEFB	0D0H
+   602  0475  50414745          	DEFM "PAGE"
+   603                          ;
+   604  0479  11                	DEFB	11H
+   605  047a  4d697373696e6720  	DEFM "Missing "
+   606  0482  12                	DEFB	12H
+   607  0483  4e6f207375636820  	DEFM "No such "
+   608  048b  13                	DEFB	13H
+   609  048c  42616420          	DEFM "Bad "
+   610  0490  14                	DEFB	14H
+   611  0491  2072616e6765      	DEFM " range"
+   612  0497  15                	DEFB	15H
+   613  0498  7661726961626c65  	DEFM "variable"
+   614  04a0  16                	DEFB	16H
+   615  04a1  4f7574206f66      	DEFM "Out of"
+   616  04a7  17                	DEFB	17H
+   617  04a8  4e6f20            	DEFM "No "
+   618  04ab  18                	DEFB	18H
+   619  04ac  207370616365      	DEFM " space"
+   620  04b2  19                	DEFB	19H
+   621  04b3  4e6f7420696e2061  	DEFM "Not in a "
+              20                
+   622  04bc  1a                	DEFB	1AH
+   623  04bd  206c6f6f70        	DEFM " loop"
+   624  04c2  1b                	DEFB	1BH
+   625  04c3  206e6f7420        	DEFM " not "
+   626                          KEYWDL	EQU	$-KEYWDS
+   627  04c8  ffff              	DEFW	-1
+   628                          ;
+   629                          ;LIST OF IMMEDIATE MODE COMMANDS:
+   630                          ;
+   631  04ca  80                COMNDS:	DEFB	80H
+   632  04cb  4155544f          	DEFM "AUTO"
+   633  04cf  81                	DEFB	81H
+   634  04d0  44454c455445      	DEFM "DELETE"
+   635  04d6  82                	DEFB	82H
+   636  04d7  4c495354          	DEFM "LIST"
+   637  04db  83                	DEFB	83H
+   638  04dc  4c4f4144          	DEFM "LOAD"
+   639  04e0  84                	DEFB	84H
+   640  04e1  4e455720          	DEFM "NEW "
+   641  04e5  85                	DEFB	85H
+   642  04e6  4f4c4420          	DEFM "OLD "
+   643  04ea  86                	DEFB	86H
+   644  04eb  52454e554d424552  	DEFM "RENUMBER"
+   645  04f3  87                	DEFB	87H
+   646  04f4  53415645          	DEFM "SAVE"
+   647  04f8  ffff              	DEFW	-1
+   648                          ;
+   649                          ;IMMEDIATE MODE COMMANDS:
+   650                          ;
+   651  04fa  cc07              CMDTAB:	DEFW	AUTO
+   652  04fc  6f06              	DEFW	DELETE
+   653  04fe  9706              	DEFW	LIST
+   654  0500  eb07              	DEFW	LOAD
+   655  0502  e607              	DEFW	NEW
+   656  0504  f907              	DEFW	OLD
+   657  0506  1c07              	DEFW	RENUM
+   658  0508  1208              	DEFW	SAVE
+   659                          ;
+   660                          ;ERROR MESSAGES:
+   661                          ;
+   662  050a  17                ERRWDS:	DEFB	17H
+   663  050b  726f6f6d          	DEFM "room"
+   664  050f  00                	DEFB	0
+   665  0510  16                	DEFB	16H
+   666  0511  14                	DEFB	14H
+   667  0512  0000              	DEFW	0
+   668  0514  4d756c7469706c65  	DEFM "Multiple label"
+              206c6162656c      
+   669  0522  00                	DEFB	0
+   670  0523  4d697374616b65    	DEFM "Mistake"
+   671  052a  00                	DEFB	0
+   672  052b  11                	DEFB	11H
+   673  052c  2c                	DEFM ","
+   674  052d  00                	DEFB	0
+   675  052e  54797065206d6973  	DEFM "Type mismatch"
+              6d61746368        
+   676  053b  00                	DEFB	0
+   677  053c  19                	DEFB	19H
+   678  053d  a4                	DEFB	TFN
+   679  053e  0000              	DEFW	0
+   680  0540  11                	DEFB	11H
+   681  0541  22                	DEFB 22H	; double-quote char
+   682  0542  00                	DEFB	0
+   683  0543  13                	DEFB	13H
+   684  0544  de                	DEFB	TDIM
+   685  0545  00                	DEFB	0
+   686  0546  de                	DEFB	TDIM
+   687  0547  18                	DEFB	18H
+   688  0548  00                	DEFB	0
+   689  0549  19                	DEFB	19H
+   690  054a  a4                	DEFB	TFN
+   691  054b  206f7220          	DEFM " or "
+   692  054f  f2                	DEFB	TPROC
+   693  0550  00                	DEFB	0
+   694  0551  19                	DEFB	19H
+   695  0552  f2                	DEFB	TPROC
+   696  0553  00                	DEFB	0
+   697  0554  13                	DEFB	13H
+   698  0555  757365206f662061  	DEFM "use of array"
+              72726179          
+   699  0561  00                	DEFB	0
+   700  0562  13                	DEFB	13H
+   701  0563  7375627363726970  	DEFM "subscript"
+              74                
+   702  056c  00                	DEFB	0
+   703  056d  53796e7461782065  	DEFM "Syntax error"
+              72726f72          
+   704  0579  00                	DEFB	0
+   705  057a  457363617065      	DEFM "Escape"
+   706  0580  00                	DEFB	0
+   707  0581  4469766973696f6e  	DEFM "Division by zero"
+              206279207a65726f  
+   708  0591  00                	DEFB	0
+   709  0592  537472696e672074  	DEFM "String too long"
+              6f6f206c6f6e67    
+   710  05a1  00                	DEFB	0
+   711  05a2  4e756d6265722074  	DEFM "Number too big"
+              6f6f20626967      
+   712  05b0  00                	DEFB	0
+   713  05b1  2d766520726f6f74  	DEFM "-ve root"
+   714  05b9  00                	DEFB	0
+   715  05ba  4c6f67            	DEFM "Log"
+   716  05bd  14                	DEFB	14H
+   717  05be  00                	DEFB	0
+   718  05bf  4163637572616379  	DEFM "Accuracy lost"
+              206c6f7374        
+   719  05cc  00                	DEFB	0
+   720  05cd  4578706f6e656e74  	DEFM "Exponent"
+   721  05d5  14                	DEFB	14H
+   722  05d6  0000              	DEFW	0
+   723  05d8  12                	DEFB	12H
+   724  05d9  15                	DEFB	15H
+   725  05da  00                	DEFB	0
+   726  05db  11                	DEFB	11H
+   727  05dc  29                	DEFM ")"
+   728  05dd  00                	DEFB	0
+   729  05de  13                	DEFB	13H
+   730  05df  686578206f722062  	DEFM "hex or binary"
+              696e617279        
+   731  05ec  00                	DEFB	0
+   732  05ed  12                	DEFB	12H
+   733  05ee  a4                	DEFB	TFN
+   734  05ef  2f                	DEFM "/"
+   735  05f0  f2                	DEFB	TPROC
+   736  05f1  00                	DEFB	0
+   737  05f2  13                	DEFB	13H
+   738  05f3  63616c6c          	DEFM "call"
+   739  05f7  00                	DEFB	0
+   740  05f8  13                	DEFB	13H
+   741  05f9  617267756d656e74  	DEFM "arguments"
+              73                
+   742  0602  00                	DEFB	0
+   743  0603  19                	DEFB	19H
+   744  0604  e3                	DEFB	TFOR
+   745  0605  1a                	DEFB	1AH
+   746  0606  00                	DEFB	0
+   747  0607  43616e2774206d61  	DEFM "Can't match "
+              74636820          
+   748  0613  e3                	DEFB	TFOR
+   749  0614  00                	DEFB	0
+   750  0615  13                	DEFB	13H
+   751  0616  e3                	DEFB	TFOR
+   752  0617  20                	DEFM " "
+   753  0618  15                	DEFB	15H
+   754  0619  0000              	DEFW	0
+   755  061b  11                	DEFB	11H
+   756  061c  b8                	DEFB	TTO
+   757  061d  0000              	DEFW	0
+   758  061f  17                	DEFB	17H
+   759  0620  e4                	DEFB	TGOSUB
+   760  0621  00                	DEFB	0
+   761  0622  ee                	DEFB	TON
+   762  0623  2073796e746178    	DEFM " syntax"
+   763  062a  00                	DEFB	0
+   764  062b  ee                	DEFB	TON
+   765  062c  14                	DEFB	14H
+   766  062d  00                	DEFB	0
+   767  062e  12                	DEFB	12H
+   768  062f  6c696e65          	DEFM "line"
+   769  0633  00                	DEFB	0
+   770  0634  16                	DEFB	16H
+   771  0635  20                	DEFM " "
+   772  0636  dc                	DEFB	TDATA
+   773  0637  00                	DEFB	0
+   774  0638  19                	DEFB	19H
+   775  0639  f5                	DEFB	TREPEAT
+   776  063a  1a                	DEFB	1AH
+   777  063b  00                	DEFB	0
+   778  063c  13                	DEFB	13H
+   779  063d  10                	DEFB	TEXIT
+   780  063e  00                	DEFB	0
+   781  063f  11                	DEFB	11H
+   782  0640  23                	DEFM "#"
+   783  0641  00                	DEFB	0
+   784  0642  19                	DEFB	19H		;46 Not in a WHILE loop
+   785  0643  c7                	DEFB	TWHILE
+   786  0644  1a                	DEFB	1AH
+   787  0645  00                	DEFB	0
+   788  0646  11                	DEFB	11H		;47 Missing ENDCASE
+   789  0647  cb                	DEFB	TENDCASE
+   790  0648  00                	DEFB	0
+   791  0649  ca                	DEFB	TOF		;48 OF not last
+   792  064a  1b                	DEFB	1BH
+   793  064b  6c617374          	DEFM "last"
+   794  064f  00                	DEFB	0
+   795  0650  11                	DEFB	11H		;49 Missing ENDIF
+   796  0651  cd                	DEFB	TENDIF
+   797  0652  00                	DEFB	0
+   798  0653  0000              	DEFW	0
+   799  0655  00                	DEFB	0
+   800  0656  ee                	DEFB	TON		;53 ON ERROR not LOCAL
+   801  0657  20                	DEFM " "
+   802  0658  85                	DEFB	TERROR
+   803  0659  1b                	DEFB	1BH
+   804  065a  ea                	DEFB	TLOCAL
+   805  065b  00                	DEFB	0
+   806  065c  dc                	DEFB	TDATA		;54 DATA not LOCAL
+   807  065d  1b                	DEFB	1BH
+   808  065e  ea                	DEFB	TLOCAL
+   809  065f  00                	DEFB	0
+   810                          ;
+   811                          ;Indent tokens (first four needn't be at start of line):
+   812                          ;
+   813  0660  e3                TOKADD:	DEFB	TFOR
+   814  0661  f5                	DEFB	TREPEAT
+   815  0662  c7                	DEFB	TWHILE
+   816  0663  c8                	DEFB	TCASE
+   817  0664  8b                	DEFB	TELSE
+   818  0665  c9                	DEFB	TWHEN
+   819  0666  cc                	DEFB	TOTHERWISE
+   820                          LENADD	EQU	$-TOKADD
+   821                          ;
+   822                          ;Outdent tokens (first three needn't be at start of line):
+   823                          ;
+   824  0667  ed                TOKSUB:	DEFB	TNEXT
+   825  0668  fd                	DEFB	TUNTIL
+   826  0669  ce                	DEFB	TENDWHILE
+   827  066a  cb                	DEFB	TENDCASE
+   828  066b  cd                	DEFB	TENDIF
+   829  066c  8b                	DEFB	TELSE
+   830  066d  c9                	DEFB	TWHEN
+   831  066e  cc                	DEFB	TOTHERWISE
+   832                          LENSUB	EQU	$-TOKSUB
+   833                          ;
+   834                          ;COMMANDS:
+   835                          ;
+   836                          ;DELETE line,line
+   837                          ;
+   838  066f  cdc00c            DELETE:	CALL	DLPAIR
+   839  0672  7e                DELET1:	LD	A,(HL)
+   840  0673  b7                	OR	A
+   841  0674  2879              	JR	Z,WARMNC
+   842  0676  23                	INC	HL
+   843  0677  5e                	LD	E,(HL)
+   844  0678  23                	INC	HL
+   845  0679  56                	LD	D,(HL)
+   846  067a  2b                	DEC	HL
+   847  067b  2b                	DEC	HL
+   848  067c  eb                	EX	DE,HL
+   849  067d  37                	SCF
+   850  067e  ed42              	SBC	HL,BC
+   851  0680  eb                	EX	DE,HL
+   852  0681  306c              	JR	NC,WARMNC
+   853  0683  c5                	PUSH	BC
+   854  0684  cdd208            	CALL	DEL
+   855  0687  c1                	POP	BC
+   856  0688  18e8              	JR	DELET1
+   857                          ;
+   858                          ;LISTO expr
+   859                          ;
+   860  068a  fd23              LISTO:	INC	IY		;SKIP "O"
+   861  068c  cd0000            	CALL	EXPRI
+   862  068f  d9                	EXX
+   863  0690  7d                	LD	A,L
+   864  0691  320000            	LD	(LISTON),A
+   865  0694  c39900            	JP	CLOOP
+   866                          ;
+   867                          ;LIST
+   868                          ;LIST line
+   869                          ;LIST line,line [IF string]
+   870                          ;LIST ,line
+   871                          ;LIST line,
+   872                          ;
+   873  0697  fe4f              LIST:	CP	'O'
+   874  0699  28ef              	JR	Z,LISTO
+   875  069b  0e01              	LD	C,1
+   876  069d  110000            	LD	DE,BUFFER
+   877  06a0  cd010d            	CALL	LEXAN2
+   878  06a3  12                	LD	(DE),A
+   879  06a4  fd210000          	LD	IY,BUFFER
+   880  06a8  cdc00c            	CALL	DLPAIR
+   881  06ab  cdf40d            	CALL	NXT
+   882  06ae  fee7              	CP	TIF		;IF CLAUSE ?
+   883  06b0  3e00              	LD	A,0		;INIT IF-CLAUSE LENGTH
+   884  06b2  2015              	JR	NZ,LISTB
+   885  06b4  fd23              	INC	IY		;SKIP IF
+   886  06b6  cdf40d            	CALL	NXT		;SKIP SPACES (IF ANY)
+   887  06b9  eb                	EX	DE,HL
+   888  06ba  fde5              	PUSH	IY
+   889  06bc  e1                	POP	HL		;HL ADDRESSES IF CLAUSE
+   890  06bd  3e0d              	LD	A,CR
+   891  06bf  c5                	PUSH	BC
+   892  06c0  010001            	LD	BC,256
+   893  06c3  edb1              	CPIR			;LOCATE CR
+   894  06c5  79                	LD	A,C
+   895  06c6  2f                	CPL			;A = SUBSTRING LENGTH
+   896  06c7  c1                	POP	BC
+   897  06c8  eb                	EX	DE,HL
+   898  06c9  5f                LISTB:	LD	E,A		;IF-CLAUSE LENGTH
+   899  06ca  78                	LD	A,B
+   900  06cb  b1                	OR	C
+   901  06cc  2001              	JR	NZ,LISTA
+   902  06ce  0b                	DEC	BC
+   903  06cf  d9                LISTA:	EXX
+   904  06d0  dd210000          	LD	IX,LISTON
+   905  06d4  1e00              	LD	E,0		;INDENTATION COUNT
+   906  06d6  d9                	EXX
+   907  06d7  3e14              	LD	A,20
+   908                          ;
+   909  06d9  c5                LISTC:	PUSH	BC		;SAVE HIGH LINE NUMBER
+   910  06da  d5                	PUSH	DE		;SAVE IF-CLAUSE LENGTH
+   911  06db  e5                	PUSH	HL		;SAVE PROGRAM POINTER
+   912  06dc  08                	EX	AF,AF'
+   913  06dd  7e                	LD	A,(HL)
+   914  06de  b7                	OR	A
+   915  06df  280e              	JR	Z,WARMNC
+   916                          ;
+   917                          ;CHECK IF PAST TERMINATING LINE NUMBER:
+   918                          ;
+   919  06e1  7b                	LD	A,E		;A = IF-CLAUSE LENGTH
+   920  06e2  23                	INC	HL
+   921  06e3  5e                	LD	E,(HL)
+   922  06e4  23                	INC	HL
+   923  06e5  56                	LD	D,(HL)		;DE = LINE NUMBER
+   924  06e6  2b                	DEC	HL
+   925  06e7  2b                	DEC	HL
+   926  06e8  d5                	PUSH	DE		;SAVE LINE NUMBER
+   927  06e9  eb                	EX	DE,HL
+   928  06ea  37                	SCF
+   929  06eb  ed42              	SBC	HL,BC
+   930  06ed  eb                	EX	DE,HL
+   931  06ee  d1                	POP	DE		;RESTORE LINE NUMBER
+   932  06ef  d29800            WARMNC:	JP	NC,WARM
+   933  06f2  4e                	LD	C,(HL)		;C = LINE LENGTH + 4
+   934  06f3  47                	LD	B,A		;B = IF-CLAUSE LENGTH
+   935                          ;
+   936                          ;CHECK FOR IF CLAUSE:
+   937                          ;
+   938  06f4  23                	INC	HL
+   939  06f5  23                	INC	HL
+   940  06f6  23                	INC	HL		;HL ADDRESSES LINE TEXT
+   941  06f7  0d                	DEC	C
+   942  06f8  0d                	DEC	C
+   943  06f9  0d                	DEC	C
+   944  06fa  0d                	DEC	C		;C = LINE LENGTH
+   945  06fb  d5                	PUSH	DE		;SAVE LINE NUMBER
+   946  06fc  e5                	PUSH	HL		;SAVE LINE ADDRESS
+   947  06fd  af                	XOR	A		;A <- 0
+   948  06fe  b8                	CP	B		;WAS THERE AN IF-CLAUSE
+   949  06ff  fde5              	PUSH	IY
+   950  0701  d1                	POP	DE		;DE ADDRESSES IF-CLAUSE
+   951  0702  c40000            	CALL	NZ,SEARCH	;SEARCH FOR IF CLAUSE
+   952  0705  e1                	POP	HL		;RESTORE LINE ADDRESS
+   953  0706  d1                	POP	DE		;RESTORE LINE NUMBER
+   954  0707  fde5              	PUSH	IY
+   955  0709  cc4609            	CALL	Z,LISTIT	;LIST IF MATCH
+   956  070c  fde1              	POP	IY
+   957                          ;
+   958  070e  08                	EX	AF,AF'
+   959  070f  3d                	DEC	A
+   960  0710  cd0000            	CALL	LTRAP
+   961  0713  e1                	POP	HL		;RESTORE POINTER
+   962  0714  5e                	LD	E,(HL)
+   963  0715  1600              	LD	D,0
+   964  0717  19                	ADD	HL,DE		;ADDRESS NEXT LINE
+   965  0718  d1                	POP	DE		;RESTORE IF-CLAUSE LEN
+   966  0719  c1                	POP	BC		;RESTORE HI LINE NUMBER
+   967  071a  18bd              	JR	LISTC
+   968                          ;
+   969                          ;RENUMBER
+   970                          ;RENUMBER start
+   971                          ;RENUMBER start,increment
+   972                          ;RENUMBER ,increment
+   973                          ;
+   974  071c  cd2c09            RENUM:	CALL	CLEAR		;USES DYNAMIC AREA
+   975  071f  cd9d0c            	CALL	PAIR		;LOAD HL,BC
+   976  0722  d9                	EXX
+   977  0723  2a0000            	LD	HL,(PAGE)
+   978  0726  ed5b0000          	LD	DE,(LOMEM)
+   979  072a  7e                RENUM1:	LD	A,(HL)		;BUILD TABLE
+   980  072b  b7                	OR	A
+   981  072c  2828              	JR	Z,RENUM2
+   982  072e  23                	INC	HL
+   983  072f  4e                	LD	C,(HL)		;OLD LINE NUMBER
+   984  0730  23                	INC	HL
+   985  0731  46                	LD	B,(HL)
+   986  0732  eb                	EX	DE,HL
+   987  0733  71                	LD	(HL),C
+   988  0734  23                	INC	HL
+   989  0735  70                	LD	(HL),B
+   990  0736  23                	INC	HL
+   991  0737  d9                	EXX
+   992  0738  e5                	PUSH	HL
+   993  0739  09                	ADD	HL,BC		;ADD INCREMENT
+   994  073a  da980c            	JP	C,TOOBIG	;"Too big"
+   995  073d  d9                	EXX
+   996  073e  c1                	POP	BC
+   997  073f  71                	LD	(HL),C
+   998  0740  23                	INC	HL
+   999  0741  70                	LD	(HL),B
+  1000  0742  23                	INC	HL
+  1001  0743  eb                	EX	DE,HL
+  1002  0744  2b                	DEC	HL
+  1003  0745  2b                	DEC	HL
+  1004  0746  af                	XOR	A
+  1005  0747  47                	LD	B,A
+  1006  0748  4e                	LD	C,(HL)
+  1007  0749  09                	ADD	HL,BC		;NEXT LINE
+  1008  074a  eb                	EX	DE,HL
+  1009  074b  e5                	PUSH	HL
+  1010  074c  24                	INC	H
+  1011  074d  ed72              	SBC	HL,SP
+  1012  074f  e1                	POP	HL
+  1013  0750  eb                	EX	DE,HL
+  1014  0751  38d7              	JR	C,RENUM1	;CONTINUE
+  1015  0753  c32d08            	JP	ERROR		;'No room' (A = 0)
+  1016                          ;
+  1017  0756  eb                RENUM2:	EX	DE,HL
+  1018  0757  36ff              	LD	(HL),-1
+  1019  0759  23                	INC	HL
+  1020  075a  36ff              	LD	(HL),-1
+  1021  075c  ed5b0000          	LD	DE,(LOMEM)
+  1022  0760  d9                	EXX
+  1023  0761  2a0000            	LD	HL,(PAGE)
+  1024  0764  4e                RENUM3:	LD	C,(HL)
+  1025  0765  79                	LD	A,C
+  1026  0766  b7                	OR	A
+  1027  0767  2886              	JR	Z,WARMNC
+  1028  0769  d9                	EXX
+  1029  076a  eb                	EX	DE,HL
+  1030  076b  23                	INC	HL
+  1031  076c  23                	INC	HL
+  1032  076d  5e                	LD	E,(HL)
+  1033  076e  23                	INC	HL
+  1034  076f  56                	LD	D,(HL)
+  1035  0770  23                	INC	HL
+  1036  0771  d5                	PUSH	DE
+  1037  0772  eb                	EX	DE,HL
+  1038  0773  d9                	EXX
+  1039  0774  d1                	POP	DE
+  1040  0775  23                	INC	HL
+  1041  0776  73                	LD	(HL),E		;NEW LINE NUMBER
+  1042  0777  23                	INC	HL
+  1043  0778  72                	LD	(HL),D
+  1044  0779  23                	INC	HL
+  1045  077a  0d                	DEC	C
+  1046  077b  0d                	DEC	C
+  1047  077c  0d                	DEC	C
+  1048  077d  0600              	LD	B,0
+  1049  077f  3e8d              RENUM7:	LD	A,TLINO
+  1050  0781  edb1              	CPIR			;SEARCH FOR LINE NUMBER
+  1051  0783  20df              	JR	NZ,RENUM3
+  1052  0785  c5                	PUSH	BC
+  1053  0786  e5                	PUSH	HL
+  1054  0787  e5                	PUSH	HL
+  1055  0788  fde1              	POP	IY
+  1056  078a  d9                	EXX
+  1057  078b  e5                	PUSH	HL
+  1058  078c  cd0000            	CALL	DECODE		;DECODE LINE NUMBER
+  1059  078f  e1                	POP	HL
+  1060  0790  d9                	EXX
+  1061  0791  44                	LD	B,H
+  1062  0792  4d                	LD	C,L
+  1063  0793  2a0000            	LD	HL,(LOMEM)
+  1064  0796  5e                RENUM4:	LD	E,(HL)		;CROSS-REFERENCE TABLE
+  1065  0797  23                	INC	HL
+  1066  0798  56                	LD	D,(HL)
+  1067  0799  23                	INC	HL
+  1068  079a  eb                	EX	DE,HL
+  1069  079b  b7                	OR	A		;CLEAR CARRY
+  1070  079c  ed42              	SBC	HL,BC
+  1071  079e  eb                	EX	DE,HL
+  1072  079f  5e                	LD	E,(HL)		;NEW NUMBER
+  1073  07a0  23                	INC	HL
+  1074  07a1  56                	LD	D,(HL)
+  1075  07a2  23                	INC	HL
+  1076  07a3  38f1              	JR	C,RENUM4
+  1077  07a5  eb                	EX	DE,HL
+  1078  07a6  281a              	JR	Z,RENUM5	;FOUND
+  1079  07a8  cde30d            	CALL	TELL
+  1080  07ab  4661696c65642061  	DEFM "Failed at "
+              7420              
+  1081  07b5  00                	DEFB	0
+  1082  07b6  d9                	EXX
+  1083  07b7  e5                	PUSH	HL
+  1084  07b8  d9                	EXX
+  1085  07b9  e1                	POP	HL
+  1086  07ba  cd7b0a            	CALL	PBCDL
+  1087  07bd  cde409            	CALL	CRLF
+  1088  07c0  1806              	JR	RENUM6
+  1089  07c2  d1                RENUM5:	POP	DE
+  1090  07c3  d5                	PUSH	DE
+  1091  07c4  1b                	DEC	DE
+  1092  07c5  cda80d            	CALL	ENCODE		;RE-WRITE NUMBER
+  1093  07c8  e1                RENUM6:	POP	HL
+  1094  07c9  c1                	POP	BC
+  1095  07ca  18b3              	JR	RENUM7
+  1096                          ;
+  1097                          ;AUTO
+  1098                          ;AUTO start,increment
+  1099                          ;AUTO start
+  1100                          ;AUTO ,increment
+  1101                          ;
+  1102  07cc  cd9d0c            AUTO:	CALL	PAIR
+  1103  07cf  220000            	LD	(AUTONO),HL
+  1104  07d2  79                	LD	A,C
+  1105  07d3  320000            	LD	(INCREM),A
+  1106  07d6  1837              	JR	CLOOP0
+  1107                          ;
+  1108                          ;BAD
+  1109                          ;NEW
+  1110                          ;
+  1111  07d8  cde30d            BAD:	CALL	TELL		;"Bad program'
+  1112  07db  13                	DEFB	13H
+  1113  07dc  70726f6772616d    	DEFM "program"
+  1114  07e3  0d                	DEFB	CR
+  1115  07e4  0a                	DEFB	LF
+  1116  07e5  00                	DEFB	0
+  1117  07e6  cd2709            NEW:	CALL	NEWIT
+  1118  07e9  1824              	JR	CLOOP0
+  1119                          ;
+  1120                          ;LOAD filename
+  1121                          ;
+  1122  07eb  cd0000            LOAD:	CALL	EXPRS		;GET FILENAME
+  1123  07ee  3e0d              	LD	A,CR
+  1124  07f0  12                	LD	(DE),A
+  1125  07f1  cde908            	CALL	LOAD0
+  1126  07f4  cd2c09            	CALL	CLEAR
+  1127  07f7  1831              	JR	WARM0
+  1128                          ;
+  1129                          ;OLD
+  1130                          ;
+  1131  07f9  2a0000            OLD:	LD	HL,(PAGE)
+  1132  07fc  e5                	PUSH	HL
+  1133  07fd  23                	INC	HL
+  1134  07fe  23                	INC	HL
+  1135  07ff  23                	INC	HL
+  1136  0800  01fc00            	LD	BC,252
+  1137  0803  3e0d              	LD	A,CR
+  1138  0805  edb1              	CPIR
+  1139  0807  20cf              	JR	NZ,BAD
+  1140  0809  7d                	LD	A,L
+  1141  080a  e1                	POP	HL
+  1142  080b  77                	LD	(HL),A
+  1143  080c  cd0309            	CALL	CLEAN
+  1144  080f  c39900            CLOOP0:	JP	CLOOP
+  1145                          ;
+  1146                          ;SAVE filename
+  1147                          ;
+  1148  0812  cd0000            SAVE:	CALL	EXPRS		;FILENAME
+  1149  0815  3e0d              	LD	A,CR
+  1150  0817  12                	LD	(DE),A
+  1151  0818  ed5b0000          	LD	DE,(PAGE)
+  1152  081c  cd0e09            	CALL	GETTOP
+  1153  081f  b7                	OR	A
+  1154  0820  ed52              	SBC	HL,DE
+  1155  0822  44                	LD	B,H		;LENGTH OF PROGRAM
+  1156  0823  4d                	LD	C,L
+  1157  0824  210000            	LD	HL,ACCS
+  1158  0827  cd0000            	CALL	OSSAVE
+  1159  082a  c39800            WARM0:	JP	WARM
+  1160                          ;
+  1161                          ;ERROR
+  1162                          ;N.B. CARE NEEDED BECAUSE SP MAY NOT BE VALID (E.G. ABOVE HIMEM)
+  1163                          ;
+  1164  082d  210a05            ERROR:	LD	HL,ERRWDS
+  1165  0830  4f                	LD	C,A
+  1166  0831  b7                	OR	A
+  1167  0832  280c              	JR	Z,ERROR1
+  1168  0834  47                	LD	B,A		;ERROR NUMBER
+  1169  0835  af                	XOR	A
+  1170  0836  be                ERROR0:	CP	(HL)
+  1171  0837  23                	INC	HL
+  1172  0838  20fc              	JR	NZ,ERROR0
+  1173  083a  10fa              	DJNZ	ERROR0
+  1174  083c  1802              	JR	ERROR1		;MUST NOT PUSH HL HERE
+  1175                          ;
+  1176  083e  e1                EXTERR:	POP	HL
+  1177  083f  4f                	LD	C,A
+  1178  0840  220000            ERROR1:	LD	(ERRTXT),HL
+  1179  0843  2a0000            	LD	HL,(ONERSP)
+  1180  0846  7c                	LD	A,H
+  1181  0847  b5                	OR	L
+  1182  0848  ed7b0000          	LD	SP,(HIMEM)	;MUST SET SP BEFORE 'CALL'
+  1183  084c  2801              	JR	Z,ERROR4
+  1184  084e  f9                	LD	SP,HL
+  1185  084f  79                ERROR4:	LD	A,C		;ERROR NUMBER
+  1186  0850  cd440a            	CALL	SETLIN		;SP IS SET NOW
+  1187  0853  320000            	LD	(ERR),A
+  1188  0856  220000            	LD	(ERL),HL
+  1189  0859  b7                	OR	A
+  1190  085a  280b              	JR	Z,ERROR2	;'FATAL' ERROR
+  1191  085c  2a0000            	LD	HL,(ERRTRP)
+  1192  085f  7c                	LD	A,H
+  1193  0860  b5                	OR	L
+  1194  0861  e5                	PUSH	HL
+  1195  0862  fde1              	POP	IY
+  1196  0864  c20000            	JP	NZ,XEQ		;ERROR TRAPPED
+  1197  0867  ed7b0000          ERROR2:	LD	SP,(HIMEM)
+  1198  086b  ed62              	SBC	HL,HL
+  1199  086d  220000            	LD	(AUTONO),HL
+  1200  0870  220000            	LD	(TRACEN),HL	;CANCEL TRACE
+  1201  0873  cd0000            	CALL	RESET		;RESET OPSYS
+  1202  0876  cde409            	CALL	CRLF
+  1203  0879  cdce0d            	CALL	REPORT		;MESSAGE
+  1204  087c  2a0000            	LD	HL,(ERL)
+  1205  087f  cd6b0a            	CALL	SAYLN
+  1206  0882  1e00              	LD	E,0
+  1207  0884  dc0000            	CALL	C,OSSHUT	;CLOSE ALL FILES
+  1208  0887  cde409            	CALL	CRLF
+  1209  088a  1883              	JR	CLOOP0
+  1210                          ;
+  1211                          ;SUBROUTINES:
+  1212                          ;
+  1213                          ;
+  1214                          ;LEX - SEARCH FOR KEYWORDS
+  1215                          ;   Inputs: HL = start of keyword table
+  1216                          ;           IY = start of match text
+  1217                          ;  Outputs: If found, Z-flag set, A=token.
+  1218                          ;           If not found, Z-flag reset, A=(IY).
+  1219                          ;           IY updated (if NZ, IY unchanged).
+  1220                          ; Destroys: A,B,H,L,IY,F
+  1221                          ;
+  1222  088c  216d01            LEX:	LD	HL,KEYWDS
+  1223  088f  fd7e00            LEX0:	LD	A,(IY)
+  1224  0892  46                	LD	B,(HL)
+  1225  0893  23                	INC	HL
+  1226  0894  be                	CP	(HL)
+  1227  0895  280a              	JR	Z,LEX2
+  1228  0897  d8                	RET	C		;FAIL EXIT
+  1229  0898  23                LEX1:	INC	HL
+  1230  0899  7e                	LD	A,(HL)
+  1231  089a  fea0              	CP	160
+  1232  089c  ea9808            	JP	PE,LEX1
+  1233  089f  18ee              	JR	LEX0
+  1234                          ;
+  1235  08a1  fde5              LEX2:	PUSH	IY		;SAVE POINTER
+  1236  08a3  23                LEX3:	INC	HL
+  1237  08a4  7e                	LD	A,(HL)
+  1238  08a5  fea0              	CP	160
+  1239  08a7  e2ce08            	JP	PO,LEX6		;FOUND
+  1240  08aa  fd23              	INC	IY
+  1241  08ac  fd7e00            	LD	A,(IY)
+  1242  08af  be                	CP	(HL)
+  1243  08b0  2005              	JR	NZ,LEX7
+  1244  08b2  fea1              	CP	161
+  1245  08b4  eaa308            	JP	PE,LEX3
+  1246  08b7  fd7e00            LEX7:	LD	A,(IY)
+  1247  08ba  fe2e              	CP	'.'
+  1248  08bc  2810              	JR	Z,LEX6		;FOUND (ABBREV.)
+  1249  08be  cde50c            	CALL	RANGE1
+  1250  08c1  3804              	JR	C,LEX5
+  1251  08c3  fde1              LEX4:	POP	IY		;RESTORE POINTER
+  1252  08c5  18d1              	JR	LEX1
+  1253                          ;
+  1254  08c7  7e                LEX5:	LD	A,(HL)
+  1255  08c8  fe20              	CP	' '
+  1256  08ca  20f7              	JR	NZ,LEX4
+  1257  08cc  fd2b              	DEC	IY
+  1258  08ce  f1                LEX6:	POP	AF
+  1259  08cf  af                	XOR	A
+  1260  08d0  78                	LD	A,B
+  1261  08d1  c9                	RET
+  1262                          ;
+  1263                          ;DEL - DELETE A PROGRAM LINE.
+  1264                          ;   Inputs: HL addresses program line.
+  1265                          ; Destroys: B,C,F
+  1266                          ;
+  1267  08d2  d5                DEL:	PUSH	DE
+  1268  08d3  e5                	PUSH	HL
+  1269  08d4  e5                	PUSH	HL
+  1270  08d5  0600              	LD	B,0
+  1271  08d7  4e                	LD	C,(HL)
+  1272  08d8  09                	ADD	HL,BC
+  1273  08d9  e5                	PUSH	HL
+  1274  08da  eb                	EX	DE,HL
+  1275  08db  cd0e09            	CALL	GETTOP
+  1276  08de  ed52              	SBC	HL,DE
+  1277  08e0  44                	LD	B,H
+  1278  08e1  4d                	LD	C,L
+  1279  08e2  e1                	POP	HL
+  1280  08e3  d1                	POP	DE
+  1281  08e4  edb0              	LDIR			;DELETE LINE
+  1282  08e6  e1                	POP	HL
+  1283  08e7  d1                	POP	DE
+  1284  08e8  c9                	RET
+  1285                          ;
+  1286                          ;LOAD0 - LOAD A DISK FILE THEN CLEAN.
+  1287                          ;   Inputs: Filename in ACCS (term CR)
+  1288                          ; Destroys: A,B,C,D,E,H,L,F
+  1289                          ;
+  1290                          ;CLEAN - CHECK FOR BAD PROGRAM, FIND END OF TEXT
+  1291                          ; AND WRITE FF FF.
+  1292                          ; Destroys: A,B,C,H,L,F
+  1293                          ;
+  1294  08e9  ed5b0000          LOAD0:	LD	DE,(PAGE)
+  1295  08ed  2100ff            	LD	HL,-256
+  1296  08f0  39                	ADD	HL,SP
+  1297  08f1  ed52              	SBC	HL,DE		;FIND AVAILABLE SPACE
+  1298  08f3  44                	LD	B,H
+  1299  08f4  4d                	LD	C,L
+  1300  08f5  210000            	LD	HL,ACCS
+  1301  08f8  cd0000            	CALL	OSLOAD		;LOAD
+  1302  08fb  d42709            	CALL	NC,NEWIT
+  1303  08fe  3e00              	LD	A,0
+  1304  0900  d22d08            	JP	NC,ERROR	;"No room"
+  1305  0903  cd0e09            CLEAN:	CALL	GETTOP
+  1306  0906  2b                	DEC	HL
+  1307  0907  36ff              	LD	(HL),-1		;WRITE &FFFF
+  1308  0909  2b                	DEC	HL
+  1309  090a  36ff              	LD	(HL),-1
+  1310  090c  181e              	JR	CLEAR
+  1311                          ;
+  1312  090e  2a0000            GETTOP:	LD	HL,(PAGE)
+  1313  0911  0600              	LD	B,0
+  1314  0913  3e0d              	LD	A,CR
+  1315  0915  4e                GETOP1:	LD	C,(HL)
+  1316  0916  0c                	INC	C
+  1317  0917  0d                	DEC	C
+  1318  0918  2809              	JR	Z,GETOP2
+  1319  091a  09                	ADD	HL,BC
+  1320  091b  2b                	DEC	HL
+  1321  091c  be                	CP	(HL)
+  1322  091d  23                	INC	HL
+  1323  091e  28f5              	JR	Z,GETOP1
+  1324  0920  c3d807            	JP	BAD
+  1325  0923  23                GETOP2:	INC	HL		;N.B. CALLED FROM NEWIT
+  1326  0924  23                	INC	HL
+  1327  0925  23                	INC	HL
+  1328  0926  c9                	RET
+  1329                          ;
+  1330                          ;NEWIT - NEW PROGRAM THEN CLEAR
+  1331                          ;   Destroys: H,L
+  1332                          ;
+  1333                          ;CLEAR - CLEAR ALL DYNAMIC VARIABLES INCLUDING
+  1334                          ; FUNCTION AND PROCEDURE POINTERS.
+  1335                          ;   Destroys: Nothing
+  1336                          ;
+  1337  0927  2a0000            NEWIT:	LD	HL,(PAGE)
+  1338  092a  3600              	LD	(HL),0
+  1339  092c  e5                CLEAR:	PUSH	HL
+  1340  092d  c5                	PUSH	BC
+  1341  092e  f5                	PUSH	AF
+  1342  092f  cd0e09            	CALL	GETTOP
+  1343  0932  220000            	LD	(LOMEM),HL
+  1344  0935  220000            	LD	(FREE),HL
+  1345  0938  210000            	LD	HL,DYNVAR
+  1346  093b  0670              	LD	B,2*(54+2)
+  1347  093d  3600              CLEAR1:	LD	(HL),0
+  1348  093f  23                	INC	HL
+  1349  0940  10fb              	DJNZ	CLEAR1
+  1350  0942  f1                	POP	AF
+  1351  0943  c1                	POP	BC
+  1352  0944  e1                	POP	HL
+  1353  0945  c9                	RET
+  1354                          ;
+  1355                          ;LISTIT - LIST A PROGRAM LINE.
+  1356                          ;    Inputs: HL addresses line
+  1357                          ;            DE = line number (binary)
+  1358                          ;	     E' = indentation count
+  1359                          ;            IX addresses LISTON
+  1360                          ;  Destroys: A,D,E,B',C',D',E',H',L',IY,F
+  1361                          ;
+  1362  0946  e5                LISTIT:	PUSH	HL
+  1363  0947  eb                	EX	DE,HL
+  1364  0948  c5                	PUSH	BC
+  1365  0949  cd7f0a            	CALL	PBCD
+  1366  094c  c1                	POP	BC
+  1367  094d  e1                	POP	HL
+  1368  094e  7e                	LD	A,(HL)
+  1369  094f  d9                	EXX
+  1370  0950  216706            	LD	HL,TOKSUB
+  1371  0953  010800            	LD	BC,LENSUB
+  1372  0956  edb1              	CPIR
+  1373  0958  ccde09            	CALL	Z,INDSUB
+  1374  095b  fecb              	CP	TENDCASE
+  1375  095d  ccde09            	CALL	Z,INDSUB
+  1376  0960  3e20              	LD	A,' '
+  1377  0962  ddcb0046          	BIT	0,(IX)
+  1378  0966  c4eb09            	CALL	NZ,OUTCHR
+  1379  0969  7b                	LD	A,E
+  1380  096a  87                	ADD	A,A
+  1381  096b  ddcb004e          	BIT	1,(IX)
+  1382  096f  c40000            	CALL	NZ,SPACES
+  1383  0972  d9                	EXX
+  1384  0973  7e                	LD	A,(HL)
+  1385  0974  1e00              	LD	E,0
+  1386  0976  d9                	EXX
+  1387  0977  010700            	LD	BC,LENADD
+  1388  097a  216006            LIST5:	LD	HL,TOKADD
+  1389  097d  edb1              	CPIR
+  1390  097f  cce209            	CALL	Z,INDADD
+  1391  0982  fec8              	CP	TCASE
+  1392  0984  cce209            	CALL	Z,INDADD
+  1393  0987  d9                	EXX
+  1394  0988  7e                LIST8:	LD	A,(HL)
+  1395  0989  23                	INC	HL
+  1396  098a  fe0d              	CP	CR
+  1397  098c  2825              	JR	Z,LIST9
+  1398  098e  57                	LD	D,A
+  1399  098f  fe10              	CP	TEXIT
+  1400  0991  2002              	JR	NZ,LIST6
+  1401  0993  cbfb              	SET	7,E
+  1402  0995  fe22              LIST6:	CP	'"'
+  1403  0997  2001              	JR	NZ,LIST7
+  1404  0999  1c                	INC	E
+  1405  099a  cdd209            LIST7:	CALL	LOUT
+  1406  099d  7b                	LD	A,E
+  1407  099e  e681              	AND	81H
+  1408  09a0  20e6              	JR	NZ,LIST8
+  1409  09a2  7e                	LD	A,(HL)
+  1410  09a3  d9                	EXX
+  1411  09a4  216706            	LD	HL,TOKSUB
+  1412  09a7  010300            	LD	BC,3
+  1413  09aa  edb1              	CPIR
+  1414  09ac  ccde09            	CALL	Z,INDSUB
+  1415  09af  0e04              	LD	C,4
+  1416  09b1  18c7              	JR	LIST5
+  1417                          ;
+  1418  09b3  7a                LIST9:	LD	A,D
+  1419  09b4  fe8c              	CP	TTHEN
+  1420  09b6  d9                	EXX
+  1421  09b7  cce209            	CALL	Z,INDADD
+  1422  09ba  d9                	EXX
+  1423  09bb  1827              	JR	CRLF
+  1424                          ;
+  1425  09bd  e5                PRLINO:	PUSH	HL
+  1426  09be  fde1              	POP	IY
+  1427  09c0  c5                	PUSH	BC
+  1428  09c1  cd0000            	CALL	DECODE
+  1429  09c4  c1                	POP	BC
+  1430  09c5  d9                	EXX
+  1431  09c6  c5                	PUSH	BC
+  1432  09c7  d5                	PUSH	DE
+  1433  09c8  cd7b0a            	CALL	PBCDL
+  1434  09cb  d1                	POP	DE
+  1435  09cc  c1                	POP	BC
+  1436  09cd  d9                	EXX
+  1437  09ce  fde5              	PUSH	IY
+  1438  09d0  e1                	POP	HL
+  1439  09d1  c9                	RET
+  1440                          ;
+  1441  09d2  cb43              LOUT:	BIT	0,E
+  1442  09d4  2015              	JR	NZ,OUTCHR
+  1443  09d6  fe8d              	CP	TLINO
+  1444  09d8  28e3              	JR	Z,PRLINO
+  1445  09da  cd040a            	CALL	OUT
+  1446  09dd  c9                	RET
+  1447                          ;
+  1448  09de  1d                INDSUB:	DEC	E
+  1449  09df  f2e309            	JP	P,INDRET
+  1450  09e2  1c                INDADD:	INC	E
+  1451  09e3  c9                INDRET:	RET
+  1452                          ;
+  1453                          ;CRLF - SEND CARRIAGE RETURN, LINE FEED.
+  1454                          ;  Destroys: A,F
+  1455                          ;OUTCHR - OUTPUT A CHARACTER TO CONSOLE.
+  1456                          ;    Inputs: A = character
+  1457                          ;  Destroys: A,F
+  1458                          ;
+  1459  09e4  3e0d              CRLF:	LD	A,CR
+  1460  09e6  cdeb09            	CALL	OUTCHR
+  1461  09e9  3e0a              	LD	A,LF
+  1462  09eb  cd0000            OUTCHR:	CALL	OSWRCH
+  1463  09ee  d60d              	SUB	CR
+  1464  09f0  2805              	JR	Z,CARRET
+  1465  09f2  d8                	RET	C		;NON-PRINTING
+  1466  09f3  3a0000            	LD	A,(COUNT)
+  1467  09f6  3c                	INC	A
+  1468  09f7  320000            CARRET:	LD	(COUNT),A
+  1469  09fa  c8                	RET	Z
+  1470  09fb  e5                	PUSH	HL
+  1471  09fc  2a0000            	LD	HL,(WIDTH)
+  1472  09ff  bd                	CP	L
+  1473  0a00  e1                	POP	HL
+  1474  0a01  c0                	RET	NZ
+  1475  0a02  18e0              	JR	CRLF
+  1476                          ;
+  1477                          ;OUT - SEND CHARACTER OR KEYWORD
+  1478                          ;   Inputs: A = character (>=10, <128)
+  1479                          ;           A = Token (<10, >=128)
+  1480                          ;  Destroys: A,F
+  1481                          ;
+  1482  0a04  fea0              OUT:	CP	160
+  1483  0a06  eaeb09            	JP	PE,OUTCHR
+  1484  0a09  c5                	PUSH	BC
+  1485  0a0a  e5                	PUSH	HL
+  1486  0a0b  216d01            	LD	HL,KEYWDS
+  1487  0a0e  015b03            	LD	BC,KEYWDL
+  1488  0a11  edb1              	CPIR
+  1489  0a13  c4eb09            	CALL	NZ,OUTCHR
+  1490  0a16  06a0              	LD	B,160
+  1491  0a18  fe91              	CP	145
+  1492  0a1a  ea1e0a            	JP	PE,TOKEN1
+  1493  0a1d  04                	INC	B
+  1494  0a1e  7e                TOKEN1:	LD	A,(HL)
+  1495  0a1f  23                	INC	HL
+  1496  0a20  b8                	CP	B
+  1497  0a21  f5                	PUSH	AF
+  1498  0a22  eceb09            	CALL	PE,OUTCHR
+  1499  0a25  f1                	POP	AF
+  1500  0a26  ea1e0a            	JP	PE,TOKEN1
+  1501  0a29  e1                	POP	HL
+  1502  0a2a  c1                	POP	BC
+  1503  0a2b  c9                	RET
+  1504                          ;
+  1505                          ;FINDL - FIND PROGRAM LINE.
+  1506                          ;   Inputs: HL = line number (binary)
+  1507                          ;  Outputs: HL addresses line (if found)
+  1508                          ;           DE = line number
+  1509                          ;           Z-flag set if found.
+  1510                          ; Destroys: A,B,C,D,E,H,L,F
+  1511                          ;
+  1512  0a2c  eb                FINDL:	EX	DE,HL
+  1513  0a2d  2a0000            	LD	HL,(PAGE)
+  1514  0a30  af                	XOR	A		;A=0
+  1515  0a31  be                	CP	(HL)
+  1516  0a32  3c                	INC	A
+  1517  0a33  d0                	RET	NC
+  1518  0a34  af                	XOR	A		;CLEAR CARRY
+  1519  0a35  47                	LD	B,A
+  1520  0a36  4e                FINDL1:	LD	C,(HL)
+  1521  0a37  e5                	PUSH	HL
+  1522  0a38  23                	INC	HL
+  1523  0a39  7e                	LD	A,(HL)
+  1524  0a3a  23                	INC	HL
+  1525  0a3b  66                	LD	H,(HL)
+  1526  0a3c  6f                	LD	L,A
+  1527  0a3d  ed52              	SBC	HL,DE
+  1528  0a3f  e1                	POP	HL
+  1529  0a40  d0                	RET	NC		;FOUND OR PAST
+  1530  0a41  09                	ADD	HL,BC
+  1531  0a42  18f2              	JR	FINDL1
+  1532                          ;
+  1533                          ;SETLIN - Search program for line containing address.
+  1534                          ;   Inputs: Address in (CURLIN)
+  1535                          ;  Outputs: Line number in HL
+  1536                          ; Destroys: B,C,D,E,H,L,F
+  1537                          ;
+  1538  0a44  0600              SETLIN:	LD	B,0
+  1539  0a46  ed5b0000          	LD	DE,(CURLIN)
+  1540  0a4a  2a0000            	LD	HL,(PAGE)
+  1541  0a4d  b7                	OR	A
+  1542  0a4e  ed52              	SBC	HL,DE
+  1543  0a50  19                	ADD	HL,DE
+  1544  0a51  3013              	JR	NC,SET3
+  1545  0a53  4e                SET1:	LD	C,(HL)
+  1546  0a54  0c                	INC	C
+  1547  0a55  0d                	DEC	C
+  1548  0a56  280e              	JR	Z,SET3
+  1549  0a58  09                	ADD	HL,BC
+  1550  0a59  ed52              	SBC	HL,DE
+  1551  0a5b  19                	ADD	HL,DE
+  1552  0a5c  38f5              	JR	C,SET1
+  1553  0a5e  ed42              	SBC	HL,BC
+  1554  0a60  23                	INC	HL
+  1555  0a61  5e                	LD	E,(HL)		;LINE NUMBER
+  1556  0a62  23                	INC	HL
+  1557  0a63  56                	LD	D,(HL)
+  1558  0a64  eb                	EX	DE,HL
+  1559  0a65  c9                SET2:	RET
+  1560                          ;
+  1561  0a66  210000            SET3:	LD	HL,0
+  1562  0a69  18fa              	JR	SET2
+  1563                          ;
+  1564                          ;SAYLN - PRINT " at line nnnn" MESSAGE.
+  1565                          ;   Inputs: HL = line number
+  1566                          ;  Outputs: Carry=0 if line number is zero.
+  1567                          ;           Carry=1 if line number is non-zero.
+  1568                          ; Destroys: A,B,C,D,E,H,L,F
+  1569                          ;
+  1570  0a6b  7c                SAYLN:	LD	A,H
+  1571  0a6c  b5                	OR	L
+  1572  0a6d  c8                	RET	Z
+  1573  0a6e  cde30d            	CALL	TELL
+  1574  0a71  206174206c696e65  	DEFM " at line "
+              20                
+  1575  0a7a  00                	DEFB	0
+  1576  0a7b  0e00              PBCDL:	LD	C,0
+  1577  0a7d  1802              	JR	PBCD0
+  1578                          ;
+  1579                          ;PBCD - PRINT NUMBER AS DECIMAL INTEGER.
+  1580                          ;   Inputs: HL = number (binary).
+  1581                          ;  Outputs: Carry = 1
+  1582                          ; Destroys: A,B,C,D,E,H,L,F
+  1583                          ;
+  1584  0a7f  0e20              PBCD:	LD	C,' '
+  1585  0a81  0605              PBCD0:	LD	B,5
+  1586  0a83  111027            	LD	DE,10000
+  1587  0a86  af                PBCD1:	XOR	A
+  1588  0a87  ed52              PBCD2:	SBC	HL,DE
+  1589  0a89  3c                	INC	A
+  1590  0a8a  30fb              	JR	NC,PBCD2
+  1591  0a8c  19                	ADD	HL,DE
+  1592  0a8d  3d                	DEC	A
+  1593  0a8e  2804              	JR	Z,PBCD3
+  1594  0a90  cbe1              	SET	4,C
+  1595  0a92  cbe9              	SET	5,C
+  1596  0a94  b1                PBCD3:	OR	C
+  1597  0a95  c4eb09            	CALL	NZ,OUTCHR
+  1598  0a98  78                	LD	A,B
+  1599  0a99  fe05              	CP	5
+  1600  0a9b  2806              	JR	Z,PBCD4
+  1601  0a9d  29                	ADD	HL,HL
+  1602  0a9e  54                	LD	D,H
+  1603  0a9f  5d                	LD	E,L
+  1604  0aa0  29                	ADD	HL,HL
+  1605  0aa1  29                	ADD	HL,HL
+  1606  0aa2  19                	ADD	HL,DE
+  1607  0aa3  11e803            PBCD4:	LD	DE,1000
+  1608  0aa6  10de              	DJNZ	PBCD1
+  1609  0aa8  37                	SCF
+  1610  0aa9  c9                	RET
+  1611                          ;
+  1612                          ;HANDLE WHOLE ARRAY:
+  1613                          ;
+  1614  0aaa  fd23              GETV1:	INC	IY
+  1615  0aac  fd23              	INC	IY		;SKIP ()
+  1616  0aae  e5                	PUSH	HL		;SET EXIT CONDITIONS
+  1617  0aaf  dde1              	POP	IX
+  1618  0ab1  7a                	LD	A,D
+  1619  0ab2  f640              	OR	64		;FLAG ARRAY
+  1620  0ab4  bf                	CP	A
+  1621  0ab5  c9                	RET
+  1622                          ;
+  1623                          ;PUTVAR - CREATE VARIABLE AND INITIALISE TO ZERO.
+  1624                          ;   Inputs: HL, IY as returned from GETVAR (NZ).
+  1625                          ;  Outputs: As GETVAR.
+  1626                          ; Destroys: everything
+  1627                          ;
+  1628  0ab6  cd250c            PUTVAR:	CALL	CREATE
+  1629  0ab9  fd7e00            	LD	A,(IY)
+  1630  0abc  fe28              	CP	'('
+  1631  0abe  207d              	JR	NZ,GETVZ	;SET EXIT CONDITIONS
+  1632  0ac0  fd7e01            	LD	A,(IY+1)
+  1633  0ac3  fe29              	CP	')'		;WHOLE ARRAY?
+  1634  0ac5  28e3              	JR	Z,GETV1
+  1635  0ac7  3e0e              ARRAY:	LD	A,14		;'Bad use of array'
+  1636  0ac9  c32d08            ERROR3:	JP	ERROR
+  1637                          ;
+  1638                          ;GETVAR - GET LOCATION OF VARIABLE, RETURN IN HL & IX
+  1639                          ;   Inputs: IY addresses first character.
+  1640                          ;  Outputs: Carry set and NZ if illegal character.
+  1641                          ;           Z-flag set if variable found, then:
+  1642                          ;            A = variable type (0,4,5,128 or 129)
+  1643                          ;                (68,69 or 193 for whole array)
+  1644                          ;            HL = IX = variable pointer.
+  1645                          ;            IY updated
+  1646                          ;           If Z-flag & carry reset, then:
+  1647                          ;            HL, IY set for subsequent PUTVAR call.
+  1648                          ; Destroys: everything
+  1649                          ;
+  1650  0acc  fd7e00            GETVAR:	LD	A,(IY)
+  1651  0acf  fe21              	CP	'!'
+  1652  0ad1  2876              	JR	Z,GETV5
+  1653  0ad3  fe3f              	CP	'?'
+  1654  0ad5  2876              	JR	Z,GETV6
+  1655  0ad7  fe7c              	CP	'|'
+  1656  0ad9  2875              	JR	Z,GETVF
+  1657  0adb  fe24              	CP	'$'
+  1658  0add  2875              	JR	Z,GETV4
+  1659  0adf  cd990b            	CALL	LOCATE
+  1660  0ae2  c0                	RET	NZ
+  1661  0ae3  fd7e00            	LD	A,(IY)
+  1662  0ae6  fe28              	CP	'('		;ARRAY?
+  1663  0ae8  204b              	JR	NZ,GETVX	;EXIT
+  1664  0aea  fd7e01            	LD	A,(IY+1)
+  1665  0aed  fe29              	CP	')'		;WHOLE ARRAY?
+  1666  0aef  28b9              	JR	Z,GETV1
+  1667  0af1  d5                	PUSH	DE		;SAVE TYPE
+  1668  0af2  7e                	LD	A,(HL)
+  1669  0af3  23                	INC	HL
+  1670  0af4  66                	LD	H,(HL)
+  1671  0af5  6f                	LD	L,A		;INDIRECT LINK
+  1672  0af6  e6fe              	AND	0FEH
+  1673  0af8  b4                	OR	H
+  1674  0af9  28cc              	JR	Z,ARRAY
+  1675  0afb  7e                	LD	A,(HL)		;NO. OF DIMENSIONS
+  1676  0afc  b7                	OR	A
+  1677  0afd  28c8              	JR	Z,ARRAY
+  1678  0aff  23                	INC	HL
+  1679  0b00  110000            	LD	DE,0		;ACCUMULATOR
+  1680  0b03  f5                	PUSH	AF
+  1681  0b04  fd23              	INC	IY		;SKIP (
+  1682  0b06  e5                GETV3:	PUSH	HL
+  1683  0b07  d5                	PUSH	DE
+  1684  0b08  cd0000            	CALL	EXPRI		;SUBSCRIPT
+  1685  0b0b  d9                	EXX
+  1686  0b0c  d1                	POP	DE
+  1687  0b0d  e3                	EX	(SP),HL
+  1688  0b0e  4e                	LD	C,(HL)
+  1689  0b0f  23                	INC	HL
+  1690  0b10  46                	LD	B,(HL)
+  1691  0b11  23                	INC	HL
+  1692  0b12  e3                	EX	(SP),HL
+  1693  0b13  eb                	EX	DE,HL
+  1694  0b14  d5                	PUSH	DE
+  1695  0b15  cd0000            	CALL	MUL16		;HL=HL*BC
+  1696  0b18  d1                	POP	DE
+  1697  0b19  19                	ADD	HL,DE
+  1698  0b1a  eb                	EX	DE,HL
+  1699  0b1b  b7                	OR	A
+  1700  0b1c  ed42              	SBC	HL,BC
+  1701  0b1e  3e0f              	LD	A,15
+  1702  0b20  30a7              	JR	NC,ERROR3	;"Subscript"
+  1703  0b22  e1                	POP	HL
+  1704  0b23  f1                	POP	AF
+  1705  0b24  3d                	DEC	A		;DIMENSION COUNTER
+  1706  0b25  201c              	JR	NZ,GETV2
+  1707  0b27  cd0000            	CALL	BRAKET		;CLOSING BRACKET
+  1708  0b2a  f1                	POP	AF		;RESTORE TYPE
+  1709  0b2b  e5                	PUSH	HL
+  1710  0b2c  cd0000            	CALL	X14OR5		;DE=DE*n
+  1711  0b2f  e1                	POP	HL
+  1712  0b30  19                	ADD	HL,DE
+  1713  0b31  57                	LD	D,A		;TYPE
+  1714  0b32  fd7e00            	LD	A,(IY)
+  1715  0b35  fe3f              GETVX:	CP	'?'
+  1716  0b37  2826              	JR	Z,GETV9
+  1717  0b39  fe21              	CP	'!'
+  1718  0b3b  281e              	JR	Z,GETV8
+  1719  0b3d  e5                GETVZ:	PUSH	HL		;SET EXIT CONDITIONS
+  1720  0b3e  dde1              	POP	IX
+  1721  0b40  7a                	LD	A,D
+  1722  0b41  bf                	CP	A
+  1723  0b42  c9                	RET
+  1724                          ;
+  1725  0b43  f5                GETV2:	PUSH	AF
+  1726  0b44  cd0000            	CALL	COMMA
+  1727  0b47  18bd              	JR	GETV3
+  1728                          ;
+  1729                          ;PROCESS UNARY & BINARY INDIRECTION:
+  1730                          ;
+  1731  0b49  3e04              GETV5:	LD	A,4		;UNARY 32-BIT INDIRN.
+  1732  0b4b  1809              	JR	GETV7
+  1733  0b4d  af                GETV6:	XOR	A		;UNARY 8-BIT INDIRECTION
+  1734  0b4e  1806              	JR	GETV7
+  1735  0b50  3e05              GETVF:	LD	A,5		;VARIANT INDIRECTION
+  1736  0b52  1802              	JR	GETV7
+  1737  0b54  3e80              GETV4:	LD	A,128		;STATIC STRING
+  1738  0b56  ed62              GETV7:	SBC	HL,HL
+  1739  0b58  f5                	PUSH	AF
+  1740  0b59  1815              	JR	GETV0
+  1741                          ;
+  1742  0b5b  0604              GETV8:	LD	B,4		;32-BIT BINARY INDIRN.
+  1743  0b5d  1802              	JR	GETVA
+  1744  0b5f  0600              GETV9:	LD	B,0		;8-BIT BINARY INDIRN.
+  1745  0b61  e5                GETVA:	PUSH	HL
+  1746  0b62  dde1              	POP	IX
+  1747  0b64  7a                	LD	A,D		;TYPE
+  1748  0b65  fe81              	CP	129
+  1749  0b67  c8                	RET	Z		;STRING!
+  1750  0b68  c5                	PUSH	BC
+  1751  0b69  cd0000            	CALL	LOADN		;LEFT OPERAND
+  1752  0b6c  cd0000            	CALL	SFIX
+  1753  0b6f  d9                	EXX
+  1754  0b70  e5                GETV0:	PUSH	HL
+  1755  0b71  fd23              	INC	IY
+  1756  0b73  cd0000            	CALL	ITEMI
+  1757  0b76  d9                	EXX
+  1758  0b77  d1                	POP	DE
+  1759  0b78  f1                	POP	AF
+  1760  0b79  19                	ADD	HL,DE
+  1761  0b7a  e5                	PUSH	HL
+  1762  0b7b  dde1              	POP	IX
+  1763  0b7d  bf                	CP	A
+  1764  0b7e  c9                	RET
+  1765                          ;
+  1766                          ;GETDEF - Find entry for FN or PROC in dynamic area.
+  1767                          ;   Inputs: IY addresses byte following "DEF" token.
+  1768                          ;  Outputs: Z flag set if found
+  1769                          ;           Carry set if neither FN or PROC first.
+  1770                          ;           If Z: HL points to entry
+  1771                          ;                 IY addresses delimiter
+  1772                          ; Destroys: A,D,E,H,L,IY,F
+  1773                          ;
+  1774  0b7f  fd7e01            GETDEF:	LD	A,(IY+1)
+  1775  0b82  cde50c            	CALL	RANGE1
+  1776  0b85  d8                	RET	C
+  1777  0b86  fd7e00            	LD	A,(IY)
+  1778  0b89  210000            	LD	HL,FNPTR
+  1779  0b8c  fea4              	CP	TFN
+  1780  0b8e  2843              	JR	Z,LOC2
+  1781  0b90  210000            	LD	HL,PROPTR
+  1782  0b93  fef2              	CP	TPROC
+  1783  0b95  283c              	JR	Z,LOC2
+  1784  0b97  37                	SCF
+  1785  0b98  c9                	RET
+  1786                          ;
+  1787                          ;LOCATE - Try to locate variable name in static or
+  1788                          ;dynamic variables.  If illegal first character return
+  1789                          ;carry, non-zero.  If found, return no-carry, zero.
+  1790                          ;If not found, return no-carry, non-zero.
+  1791                          ;   Inputs: IY addresses first character of name.
+  1792                          ;           A=(IY)
+  1793                          ;  Outputs: Z-flag set if found, then:
+  1794                          ;            IY addresses terminator
+  1795                          ;            HL addresses location of variable
+  1796                          ;            D=type of variable:  4 = integer
+  1797                          ;                                 5 = floating point
+  1798                          ;                               129 = string
+  1799                          ; Destroys: A,D,E,H,L,IY,F
+  1800                          ;
+  1801  0b99  d640              LOCATE:	SUB	'@'
+  1802  0b9b  d8                	RET	C
+  1803  0b9c  2600              	LD	H,0
+  1804  0b9e  fe1b              	CP	'Z'-'@'+1
+  1805  0ba0  301d              	JR	NC,LOC0		;NOT STATIC
+  1806  0ba2  87                	ADD	A,A
+  1807  0ba3  6f                	LD	L,A
+  1808  0ba4  fd7e01            	LD	A,(IY+1)	;2nd CHARACTER
+  1809  0ba7  fe25              	CP	'%'
+  1810  0ba9  2020              	JR	NZ,LOC1		;NOT STATIC
+  1811  0bab  fd7e02            	LD	A,(IY+2)
+  1812  0bae  fe28              	CP	'('
+  1813  0bb0  2819              	JR	Z,LOC1		;NOT STATIC
+  1814  0bb2  29                	ADD	HL,HL
+  1815  0bb3  110000            	LD	DE,STAVAR	;STATIC VARIABLES
+  1816  0bb6  19                	ADD	HL,DE
+  1817  0bb7  fd23              	INC	IY
+  1818  0bb9  fd23              	INC	IY
+  1819  0bbb  1604              	LD	D,4		;INTEGER TYPE
+  1820  0bbd  af                	XOR	A
+  1821  0bbe  c9                	RET
+  1822                          ;
+  1823  0bbf  fe1f              LOC0:	CP	'_'-'@'
+  1824  0bc1  d8                	RET	C
+  1825  0bc2  fe3b              	CP	'z'-'@'+1
+  1826  0bc4  3f                	CCF
+  1827  0bc5  3d                	DEC	A		;SET NZ
+  1828  0bc6  d8                	RET	C
+  1829  0bc7  d603              	SUB	3
+  1830  0bc9  87                	ADD	A,A
+  1831  0bca  6f                	LD	L,A
+  1832  0bcb  110000            LOC1:	LD	DE,DYNVAR	;DYNAMIC VARIABLES
+  1833  0bce  2d                	DEC	L
+  1834  0bcf  2d                	DEC	L
+  1835  0bd0  37                	SCF
+  1836  0bd1  f8                	RET	M
+  1837  0bd2  19                	ADD	HL,DE
+  1838  0bd3  5e                LOC2:	LD	E,(HL)
+  1839  0bd4  23                	INC	HL
+  1840  0bd5  56                	LD	D,(HL)
+  1841  0bd6  7a                	LD	A,D
+  1842  0bd7  b3                	OR	E
+  1843  0bd8  2849              	JR	Z,LOC6		;UNDEFINED VARIABLE
+  1844  0bda  62                	LD	H,D
+  1845  0bdb  6b                	LD	L,E
+  1846  0bdc  23                	INC	HL		;SKIP LINK
+  1847  0bdd  23                	INC	HL
+  1848  0bde  fde5              	PUSH	IY
+  1849  0be0  7e                LOC3:	LD	A,(HL)		;COMPARE
+  1850  0be1  23                	INC	HL
+  1851  0be2  fd23              	INC	IY
+  1852  0be4  fdbe00            	CP	(IY)
+  1853  0be7  28f7              	JR	Z,LOC3
+  1854  0be9  b7                	OR	A		;0=TERMINATOR
+  1855  0bea  2805              	JR	Z,LOC5		;FOUND (MAYBE)
+  1856  0bec  fde1              LOC4:	POP	IY
+  1857  0bee  eb                	EX	DE,HL
+  1858  0bef  18e2              	JR	LOC2		;TRY NEXT ENTRY
+  1859                          ;
+  1860  0bf1  fd2b              LOC5:	DEC	IY
+  1861  0bf3  fd7e00            	LD	A,(IY)
+  1862  0bf6  fe28              	CP	'('
+  1863  0bf8  2813              	JR	Z,LOCX		;FOUND
+  1864  0bfa  fd23              	INC	IY
+  1865  0bfc  cdd80c            	CALL	RANGE
+  1866  0bff  380c              	JR	C,LOCX		;FOUND
+  1867  0c01  fe28              	CP	'('
+  1868  0c03  28e7              	JR	Z,LOC4		;KEEP LOOKING
+  1869  0c05  fd7eff            	LD	A,(IY-1)
+  1870  0c08  cde50c            	CALL	RANGE1
+  1871  0c0b  30df              	JR	NC,LOC4		;KEEP LOOKING
+  1872  0c0d  d1                LOCX:	POP	DE
+  1873  0c0e  fd7eff            TYPE:	LD	A,(IY-1)
+  1874  0c11  fe24              	CP	'$'
+  1875  0c13  1681              	LD	D,129
+  1876  0c15  c8                	RET	Z		;STRING
+  1877  0c16  fe26              	CP	'&'
+  1878  0c18  1601              	LD	D,1
+  1879  0c1a  c8                	RET	Z		;BYTE
+  1880  0c1b  fe25              	CP	'%'
+  1881  0c1d  1604              	LD	D,4
+  1882  0c1f  c8                	RET	Z		;INTEGER
+  1883  0c20  14                	INC	D
+  1884  0c21  bf                	CP	A
+  1885  0c22  c9                	RET
+  1886                          ;
+  1887  0c23  3c                LOC6:	INC	A		;SET NZ
+  1888  0c24  c9                	RET
+  1889                          ;
+  1890                          ;CREATE - CREATE NEW ENTRY, INITIALISE TO ZERO.
+  1891                          ;   Inputs: HL, IY as returned from LOCATE (NZ).
+  1892                          ;  Outputs: As LOCATE, GETDEF.
+  1893                          ; Destroys: As LOCATE, GETDEF.
+  1894                          ;
+  1895  0c25  af                CREATE:	XOR	A
+  1896  0c26  ed5b0000          	LD	DE,(FREE)
+  1897  0c2a  72                	LD	(HL),D
+  1898  0c2b  2b                	DEC	HL
+  1899  0c2c  73                	LD	(HL),E
+  1900  0c2d  eb                	EX	DE,HL
+  1901  0c2e  77                	LD	(HL),A
+  1902  0c2f  23                	INC	HL
+  1903  0c30  77                	LD	(HL),A
+  1904  0c31  23                	INC	HL
+  1905  0c32  fd23              LOC7:	INC	IY
+  1906  0c34  cdd80c            	CALL	RANGE		;END OF VARIABLE?
+  1907  0c37  3814              	JR	C,LOC8
+  1908  0c39  77                	LD	(HL),A
+  1909  0c3a  23                	INC	HL
+  1910  0c3b  cde50c            	CALL	RANGE1
+  1911  0c3e  30f2              	JR	NC,LOC7
+  1912  0c40  fe28              	CP	'('
+  1913  0c42  2809              	JR	Z,LOC8
+  1914  0c44  fd7e01            	LD	A,(IY+1)
+  1915  0c47  fe28              	CP	'('
+  1916  0c49  28e7              	JR	Z,LOC7
+  1917  0c4b  fd23              	INC	IY
+  1918  0c4d  3600              LOC8:	LD	(HL),0		;TERMINATOR
+  1919  0c4f  23                	INC	HL
+  1920  0c50  e5                	PUSH	HL
+  1921  0c51  cd0e0c            	CALL	TYPE
+  1922  0c54  fd7e00            	LD	A,(IY)
+  1923  0c57  fe28              	CP	'('
+  1924  0c59  3e02              	LD	A,2		;SIZE OF INDIRECT LINK
+  1925  0c5b  2807              	JR	Z,LOC9
+  1926  0c5d  7a                	LD	A,D
+  1927  0c5e  b7                	OR	A		;STRING?
+  1928  0c5f  f2640c            	JP	P,LOC9
+  1929  0c62  3e04              	LD	A,4
+  1930  0c64  3600              LOC9:	LD	(HL),0		;INITIALISE TO ZERO
+  1931  0c66  23                	INC	HL
+  1932  0c67  3d                	DEC	A
+  1933  0c68  20fa              	JR	NZ,LOC9
+  1934  0c6a  220000            	LD	(FREE),HL
+  1935  0c6d  cd0000            	CALL	CHECK
+  1936  0c70  e1                	POP	HL
+  1937  0c71  af                	XOR	A
+  1938  0c72  c9                	RET
+  1939                          ;
+  1940                          ;LINNUM - GET LINE NUMBER FROM TEXT STRING
+  1941                          ;   Inputs: IY = Text Pointer
+  1942                          ;  Outputs: HL = Line number (zero if none)
+  1943                          ;           IY updated
+  1944                          ; Destroys: A,D,E,H,L,IY,F
+  1945                          ;
+  1946  0c73  cdf40d            LINNUM:	CALL	NXT
+  1947  0c76  210000            	LD	HL,0
+  1948  0c79  fd7e00            LINNM1:	LD	A,(IY)
+  1949  0c7c  d630              	SUB	'0'
+  1950  0c7e  d8                	RET	C
+  1951  0c7f  fe0a              	CP	10
+  1952  0c81  d0                	RET	NC
+  1953  0c82  fd23              	INC	IY
+  1954  0c84  54                	LD	D,H
+  1955  0c85  5d                	LD	E,L
+  1956  0c86  29                	ADD	HL,HL		;*2
+  1957  0c87  380f              	JR	C,TOOBIG
+  1958  0c89  29                	ADD	HL,HL		;*4
+  1959  0c8a  380c              	JR	C,TOOBIG
+  1960  0c8c  19                	ADD	HL,DE		;*5
+  1961  0c8d  3809              	JR	C,TOOBIG
+  1962  0c8f  29                	ADD	HL,HL		;*10
+  1963  0c90  3806              	JR	C,TOOBIG
+  1964  0c92  5f                	LD	E,A
+  1965  0c93  1600              	LD	D,0
+  1966  0c95  19                	ADD	HL,DE		;ADD IN DIGIT
+  1967  0c96  30e1              	JR	NC,LINNM1
+  1968  0c98  3e14              TOOBIG:	LD	A,20
+  1969  0c9a  c32d08            	JP	ERROR		;"Too big"
+  1970                          ;
+  1971                          ;PAIR - GET PAIR OF LINE NUMBERS FOR RENUMBER/AUTO.
+  1972                          ;   Inputs: IY = text pointer
+  1973                          ;  Outputs: HL = first number (10 by default)
+  1974                          ;           BC = second number (10 by default)
+  1975                          ; Destroys: A,B,C,D,E,H,L,B',C',D',E',H',L',IY,F
+  1976                          ;
+  1977  0c9d  cd730c            PAIR:	CALL	LINNUM		;FIRST
+  1978  0ca0  7c                	LD	A,H
+  1979  0ca1  b5                	OR	L
+  1980  0ca2  2002              	JR	NZ,PAIR1
+  1981  0ca4  2e0a              	LD	L,10
+  1982  0ca6  cd0000            PAIR1:	CALL	TERMQ
+  1983  0ca9  fd23              	INC	IY
+  1984  0cab  e5                	PUSH	HL
+  1985  0cac  210a00            	LD	HL,10
+  1986  0caf  c4730c            	CALL	NZ,LINNUM	;SECOND
+  1987  0cb2  e3                	EX	(SP),HL
+  1988  0cb3  c1                	POP	BC
+  1989  0cb4  78                	LD	A,B
+  1990  0cb5  b1                	OR	C
+  1991  0cb6  c0                	RET	NZ
+  1992  0cb7  cd3e08            	CALL	EXTERR
+  1993  0cba  53696c6c79        	DEFM "Silly"
+  1994  0cbf  00                	DEFB	0
+  1995                          ;
+  1996                          ;DLPAIR - GET PAIR OF LINE NUMBERS FOR DELETE/LIST.
+  1997                          ;   Inputs: IY = text pointer
+  1998                          ;  Outputs: HL = points to program text
+  1999                          ;           BC = second number (0 by default)
+  2000                          ; Destroys: A,B,C,D,E,H,L,IY,F
+  2001                          ;
+  2002  0cc0  cd730c            DLPAIR:	CALL	LINNUM
+  2003  0cc3  e5                	PUSH	HL
+  2004  0cc4  cd0000            	CALL	TERMQ
+  2005  0cc7  2809              	JR	Z,DLP1
+  2006  0cc9  fee7              	CP	TIF
+  2007  0ccb  2805              	JR	Z,DLP1
+  2008  0ccd  fd23              	INC	IY
+  2009  0ccf  cd730c            	CALL	LINNUM
+  2010  0cd2  e3                DLP1:	EX	(SP),HL
+  2011  0cd3  cd2c0a            	CALL	FINDL
+  2012  0cd6  c1                	POP	BC
+  2013  0cd7  c9                	RET
+  2014                          ;
+  2015                          ;TEST FOR VALID CHARACTER IN VARIABLE NAME:
+  2016                          ;   Inputs: IY addresses character
+  2017                          ;  Outputs: Carry set if out-of-range.
+  2018                          ; Destroys: A,F
+  2019                          ;
+  2020  0cd8  fd7e00            RANGE:	LD	A,(IY)
+  2021  0cdb  fe24              	CP	'$'
+  2022  0cdd  d8                	RET	C
+  2023  0cde  fe27              	CP	'&'+1
+  2024  0ce0  3f                	CCF
+  2025  0ce1  d0                	RET	NC
+  2026  0ce2  fe28              	CP	'('
+  2027  0ce4  c8                	RET	Z
+  2028  0ce5  fe30              RANGE1:	CP	'0'
+  2029  0ce7  d8                	RET	C
+  2030  0ce8  fe3a              	CP	'9'+1
+  2031  0cea  3f                	CCF
+  2032  0ceb  d0                	RET	NC
+  2033  0cec  fe40              	CP	'@'		;V2.4
+  2034  0cee  c8                	RET	Z
+  2035  0cef  fe41              RANGE2:	CP	'A'
+  2036  0cf1  d8                	RET	C
+  2037  0cf2  fe5b              	CP	'Z'+1
+  2038  0cf4  3f                	CCF
+  2039  0cf5  d0                	RET	NC
+  2040  0cf6  fe5f              	CP	'_'
+  2041  0cf8  d8                	RET	C
+  2042  0cf9  fe7b              	CP	'z'+1
+  2043  0cfb  3f                	CCF
+  2044  0cfc  c9                	RET
+  2045                          ;
+  2046                          ;LEXAN - LEXICAL ANALYSIS.
+  2047                          ;  Bit 0,C: 1=left, 0=right
+  2048                          ;  Bit 3,C: 1=in HEX
+  2049                          ;  Bit 4,C: 1=accept line number
+  2050                          ;  Bit 5,C: 1=in variable, FN, PROC
+  2051                          ;  Bit 6,C: 1=in REM, DATA, *
+  2052                          ;  Bit 7,C: 1=in quotes
+  2053                          ;   Inputs: IY addresses source string
+  2054                          ;           DE addresses destination string
+  2055                          ;           (must be page boundary)
+  2056                          ;           C  sets initial mode
+  2057                          ;  Outputs: DE, IY updated
+  2058                          ;           A holds carriage return
+  2059                          ;
+  2060  0cfd  12                LEXAN1:	LD	(DE),A		;TRANSFER TO BUFFER
+  2061  0cfe  13                	INC	DE		;INCREMENT POINTERS
+  2062  0cff  fd23              	INC	IY
+  2063  0d01  7b                LEXAN2:	LD	A,E		;MAIN ENTRY
+  2064  0d02  fefc              	CP	252		;TEST LENGTH
+  2065  0d04  3e13              	LD	A,19
+  2066  0d06  d22d08            	JP	NC,ERROR	;'String too long'
+  2067  0d09  fd7e00            	LD	A,(IY)
+  2068  0d0c  fe0d              	CP	CR
+  2069  0d0e  c8                	RET	Z		;END OF LINE
+  2070  0d0f  cde50c            	CALL	RANGE1
+  2071  0d12  3004              	JR	NC,LEXAN3
+  2072  0d14  cba9              	RES	5,C		;NOT IN VARIABLE
+  2073  0d16  cb99              	RES	3,C		;NOT IN HEX
+  2074  0d18  fe20              LEXAN3:	CP	' '
+  2075  0d1a  28e1              	JR	Z,LEXAN1	;PASS SPACES
+  2076  0d1c  fe2c              	CP	','
+  2077  0d1e  28dd              	JR	Z,LEXAN1	;PASS COMMAS
+  2078  0d20  fe47              	CP	'G'
+  2079  0d22  3802              	JR	C,LEXAN4
+  2080  0d24  cb99              	RES	3,C		;NOT IN HEX
+  2081  0d26  fe22              LEXAN4:	CP	'"'
+  2082  0d28  2005              	JR	NZ,LEXAN5
+  2083  0d2a  cb11              	RL	C
+  2084  0d2c  3f                	CCF			;TOGGLE C7
+  2085  0d2d  cb19              	RR	C
+  2086  0d2f  cb61              LEXAN5:	BIT	4,C
+  2087  0d31  2810              	JR	Z,LEXAN6
+  2088  0d33  cba1              	RES	4,C
+  2089  0d35  c5                	PUSH	BC
+  2090  0d36  d5                	PUSH	DE
+  2091  0d37  cd730c            	CALL	LINNUM		;GET LINE NUMBER
+  2092  0d3a  d1                	POP	DE
+  2093  0d3b  c1                	POP	BC
+  2094  0d3c  7c                	LD	A,H
+  2095  0d3d  b5                	OR	L
+  2096  0d3e  c4a80d            	CALL	NZ,ENCODE	;ENCODE LINE NUMBER
+  2097  0d41  18be              	JR	LEXAN2		;CONTINUE
+  2098                          ;
+  2099  0d43  0d                LEXAN6:	DEC	C
+  2100  0d44  2809              	JR	Z,LEXAN7	;C=1 (LEFT)
+  2101  0d46  0c                	INC	C
+  2102  0d47  20b4              	JR	NZ,LEXAN1
+  2103  0d49  b7                	OR	A
+  2104  0d4a  f48c08            	CALL	P,LEX		;TOKENISE IF POSS.
+  2105  0d4d  1816              	JR	LEXAN8
+  2106                          ;
+  2107  0d4f  fe2a              LEXAN7:	CP	'*'
+  2108  0d51  2816              	JR	Z,LEXAN9
+  2109  0d53  b7                	OR	A
+  2110  0d54  f48c08            	CALL	P,LEX		;TOKENISE IF POSS.
+  2111  0d57  fedc              	CP	TDATA
+  2112  0d59  280e              	JR	Z,LEXAN9
+  2113  0d5b  fe8f              	CP	TOKLO
+  2114  0d5d  3806              	JR	C,LEXAN8
+  2115  0d5f  fe94              	CP	TOKHI+1
+  2116  0d61  3002              	JR	NC,LEXAN8
+  2117  0d63  c640              	ADD	A,OFFSET	;LEFT VERSION
+  2118  0d65  fef4              LEXAN8:	CP	TREM
+  2119  0d67  2002              	JR	NZ,LEXANA
+  2120  0d69  cbf1              LEXAN9:	SET	6,C		;QUIT TOKENISING
+  2121  0d6b  fea4              LEXANA:	CP	TFN
+  2122  0d6d  2809              	JR	Z,LEXANB
+  2123  0d6f  fef2              	CP	TPROC
+  2124  0d71  2805              	JR	Z,LEXANB
+  2125  0d73  cdef0c            	CALL	RANGE2
+  2126  0d76  3802              	JR	C,LEXANC
+  2127  0d78  cbe9              LEXANB:	SET	5,C		;IN VARIABLE/FN/PROC
+  2128  0d7a  fe26              LEXANC:	CP	'&'
+  2129  0d7c  2002              	JR	NZ,LEXAND
+  2130  0d7e  cbd9              	SET	3,C		;IN HEX
+  2131  0d80  219f0d            LEXAND:	LD	HL,LIST1
+  2132  0d83  c5                	PUSH	BC
+  2133  0d84  010600            	LD	BC,LIST1L
+  2134  0d87  edb1              	CPIR
+  2135  0d89  c1                	POP	BC
+  2136  0d8a  2002              	JR	NZ,LEXANE
+  2137  0d8c  cbe1              	SET	4,C		;ACCEPT LINE NUMBER
+  2138  0d8e  21a30d            LEXANE:	LD	HL,LIST2
+  2139  0d91  c5                	PUSH	BC
+  2140  0d92  010500            	LD	BC,LIST2L
+  2141  0d95  edb1              	CPIR
+  2142  0d97  c1                	POP	BC
+  2143  0d98  2002              	JR	NZ,LEXANF
+  2144  0d9a  cbc1              	SET	0,C		;ENTER LEFT MODE
+  2145  0d9c  c3fd0c            LEXANF:	JP	LEXAN1
+  2146                          ;
+  2147  0d9f  e5                LIST1:	DEFB	TGOTO
+  2148  0da0  e4                	DEFB	TGOSUB
+  2149  0da1  f7                	DEFB	TRESTORE
+  2150  0da2  fc                	DEFB	TTRACE
+  2151  0da3  8c                LIST2:	DEFB	TTHEN
+  2152  0da4  8b                	DEFB	TELSE
+  2153                          LIST1L	EQU	$-LIST1
+  2154  0da5  f5                	DEFB	TREPEAT
+  2155  0da6  85                	DEFB	TERROR
+  2156  0da7  3a                	DEFB	':'
+  2157                          LIST2L	EQU	$-LIST2
+  2158                          ;
+  2159                          ;ENCODE - ENCODE LINE NUMBER INTO PSEUDO-BINARY FORM.
+  2160                          ;   Inputs: HL=line number, DE=string pointer
+  2161                          ;  Outputs: DE updated, BIT 4,C set.
+  2162                          ; Destroys: A,B,C,D,E,H,L,F
+  2163                          ;
+  2164  0da8  cbe1              ENCODE:	SET	4,C
+  2165  0daa  eb                	EX	DE,HL
+  2166  0dab  368d              	LD	(HL),TLINO
+  2167  0dad  23                	INC	HL
+  2168  0dae  7a                	LD	A,D
+  2169  0daf  e6c0              	AND	0C0H
+  2170  0db1  0f                	RRCA
+  2171  0db2  0f                	RRCA
+  2172  0db3  47                	LD	B,A
+  2173  0db4  7b                	LD	A,E
+  2174  0db5  e6c0              	AND	0C0H
+  2175  0db7  b0                	OR	B
+  2176  0db8  0f                	RRCA
+  2177  0db9  0f                	RRCA
+  2178  0dba  ee54              	XOR	01010100B
+  2179  0dbc  77                	LD	(HL),A
+  2180  0dbd  23                	INC	HL
+  2181  0dbe  7b                	LD	A,E
+  2182  0dbf  e63f              	AND	3FH
+  2183  0dc1  f640              	OR	'@'
+  2184  0dc3  77                	LD	(HL),A
+  2185  0dc4  23                	INC	HL
+  2186  0dc5  7a                	LD	A,D
+  2187  0dc6  e63f              	AND	3FH
+  2188  0dc8  f640              	OR	'@'
+  2189  0dca  77                	LD	(HL),A
+  2190  0dcb  23                	INC	HL
+  2191  0dcc  eb                	EX	DE,HL
+  2192  0dcd  c9                	RET
+  2193                          ;
+  2194                          ;TEXT - OUTPUT MESSAGE.
+  2195                          ;   Inputs: HL addresses text (terminated by nul)
+  2196                          ;  Outputs: HL addresses character following nul.
+  2197                          ; Destroys: A,H,L,F
+  2198                          ;
+  2199  0dce  2a0000            REPORT:	LD	HL,(ERRTXT)
+  2200  0dd1  7e                TEXT:	LD	A,(HL)
+  2201  0dd2  23                	INC	HL
+  2202  0dd3  b7                	OR	A
+  2203  0dd4  c8                	RET	Z
+  2204  0dd5  fe0a              	CP	LF
+  2205  0dd7  2805              	JR	Z,TEXTLF	;Token for TINT
+  2206  0dd9  cd040a            	CALL	OUT
+  2207  0ddc  18f3              	JR	TEXT
+  2208                          ;
+  2209  0dde  cdeb09            TEXTLF:	CALL	OUTCHR
+  2210  0de1  18ee              	JR	TEXT
+  2211                          ;
+  2212                          ;TELL - OUTPUT MESSAGE.
+  2213                          ;   Inputs: Text follows subroutine call (term=nul)
+  2214                          ; Destroys: A,F
+  2215                          ;
+  2216  0de3  e3                TELL:	EX	(SP),HL		;GET RETURN ADDRESS
+  2217  0de4  cdd10d            	CALL	TEXT
+  2218  0de7  e3                	EX	(SP),HL
+  2219  0de8  c9                	RET
+  2220                          ;
+  2221                          ; NLIST - Check for end of list
+  2222                          ;
+  2223  0de9  cdf40d            NLIST:	CALL	NXT
+  2224  0dec  fe2c              	CP	','		;ANOTHER VARIABLE?
+  2225  0dee  280a              	JR	Z,NXT1
+  2226  0df0  c1                	POP	BC		;DITCH RETURN ADDRESS
+  2227  0df1  c30000            	JP	XEQ
+  2228                          ;
+  2229  0df4  fd7e00            NXT:	LD	A,(IY)
+  2230  0df7  fe20              	CP	' '
+  2231  0df9  c0                	RET	NZ
+  2232  0dfa  fd23              NXT1:	INC	IY
+  2233  0dfc  18f6              	JR	NXT
+  2234                          ;
+  2235                          	; END START
+  2236                          
