@@ -18,9 +18,6 @@
 #   ERROR  -> ; ERROR (commented out, assembler messages)
 #   Character expressions converted to numeric values
 #
-# EQU definitions are left intact - each module is assembled independently
-# so duplicate definitions across modules don't conflict.
-#
 # Original .Z80 files are preserved unchanged.
 
 set -e
@@ -102,7 +99,7 @@ done
 # DIST.asm fix: replace ORG 1F0H with DEFS padding
 # DIST is CPM-only so this is safe to apply in src/
 if [ -f "$SRC_DIR/DIST.asm" ]; then
-    echo "Applying DIST.asm modular build fix..."
+    echo "Applying DIST.asm build fix..."
     temp_file=$(mktemp)
     sed \
         -e 's/^[[:space:]]*; ORG 1F0H$/\tDEFS 0F0H - $, 0\t; Pad to offset 0xF0 (address 0x1F0 when linked at 0x100)/' \

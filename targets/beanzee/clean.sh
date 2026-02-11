@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Clean build artifacts for Acorn tube target
-# Usage: cd targets/acorn && ./clean.sh
+# Clean build artifacts for BeanZee target
+# Usage: cd targets/beanzee && ./clean.sh
 
 set -e
 cd "$(dirname "$0")"

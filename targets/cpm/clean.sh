@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # Clean build artifacts for CP/M target
-# Preserves converted .asm source files
 # Usage: cd targets/cpm && ./clean.sh
 
 set -e
