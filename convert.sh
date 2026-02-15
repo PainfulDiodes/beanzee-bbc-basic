@@ -31,9 +31,6 @@ CPM_MODULES="DIST MAIN EXEC EVAL ASMB MATH HOOK CMOS DATA"
 ACORN_DIR="targets/acorn"
 ACORN_MODULES="MAIN EXEC EVAL ASMB MATH ACORN AMOS DATA"
 
-BEANZEE_DIR="targets/beanzee"
-BEANZEE_MODULES="MAIN EXEC EVAL ASMB MATH DATA"
-
 echo "Phase 1: Translating CP/M directives to z88dk syntax"
 echo "====================================================="
 
@@ -124,7 +121,7 @@ echo ""
 echo "Phase 2: Copying converted files to targets"
 echo "============================================"
 
-mkdir -p "$CPM_DIR" "$ACORN_DIR" "$BEANZEE_DIR"
+mkdir -p "$CPM_DIR" "$ACORN_DIR"
 
 # Check if a module is in a space-separated list
 has_module() {
@@ -151,11 +148,6 @@ for file in "$SRC_DIR"/*.asm; do
         echo "  $filename.asm -> $ACORN_DIR/"
         cp "$file" "$ACORN_DIR/$filename.asm"
     fi
-
-    if has_module "$filename" "$BEANZEE_MODULES"; then
-        echo "  $filename.asm -> $BEANZEE_DIR/"
-        cp "$file" "$BEANZEE_DIR/$filename.asm"
-    fi
 done
 
 # Create hex dumps of reference binaries
@@ -172,4 +164,3 @@ echo ""
 echo "Conversion complete."
 echo "To build: targets/cpm/build.sh     (CP/M target)"
 echo "          targets/acorn/build.sh   (Acorn tube target)"
-echo "          targets/beanzee/build.sh (BeanZee target)"

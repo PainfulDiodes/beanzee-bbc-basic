@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 
-TARGETS="acorn beanzee cpm"
+TARGETS="acorn cpm"
 failed=0
 
 for target in $TARGETS; do

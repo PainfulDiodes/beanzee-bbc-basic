@@ -10,7 +10,6 @@
 #   - Hex dumps of reference binaries
 #
 # Does NOT remove:
-#   - Primary source files (BEANZEE.asm, BMOS.asm, BHOOK.asm in targets/beanzee/)
 #   - Other build outputs (.bin, .map, .hex) - use per-target clean.sh for those
 
 set -e
@@ -20,7 +19,6 @@ SRC_DIR="src"
 # Modules copied from src/ to each target by convert.sh
 CPM_MODULES="DIST MAIN EXEC EVAL ASMB MATH HOOK CMOS DATA"
 ACORN_MODULES="MAIN EXEC EVAL ASMB MATH ACORN AMOS DATA"
-BEANZEE_MODULES="MAIN EXEC EVAL ASMB MATH DATA"
 
 count=0
 
@@ -48,7 +46,6 @@ clean_target() {
 
 clean_target "targets/cpm" "$CPM_MODULES"
 clean_target "targets/acorn" "$ACORN_MODULES"
-clean_target "targets/beanzee" "$BEANZEE_MODULES"
 
 # Clean hex dumps of reference binaries
 for hex_file in bin/cpm/BBCBASIC.hex bin/acorn/BBCBASIC.hex; do

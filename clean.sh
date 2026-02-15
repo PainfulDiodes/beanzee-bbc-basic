@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 
-TARGETS="acorn beanzee cpm"
+TARGETS="acorn cpm"
 
 for target in $TARGETS; do
     echo "Cleaning $target..."

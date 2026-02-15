@@ -65,7 +65,7 @@ The `convert.sh` script automates these conversions:
 ./convert.sh
 ```
 
-This converts `.Z80` files to `.asm` in `src/`, then copies them to per-target directories (`targets/cpm/`, `targets/acorn/`, `targets/beanzee/`), applying:
+This converts `.Z80` files to `.asm` in `src/`, then copies them to per-target directories (`targets/cpm/`, `targets/acorn/`), applying:
 
 - Directive translations (GLOBAL→PUBLIC, EXTRN→EXTERN)
 - Comment out ORG and END directives (linker controls placement)
@@ -86,7 +86,6 @@ The build mirrors the original CP/M linker-based approach, assembling each modul
 ./convert.sh              # Convert source files (run when the forked source changes)
 targets/cpm/build.sh      # Build CP/M version
 targets/acorn/build.sh    # Build Acorn version
-targets/beanzee/build.sh  # Build BeanZee version
 ```
 
 Each target's build.sh has a hardcoded module list and memory layout. Building one target does not affect the other's artefacts.
@@ -161,20 +160,13 @@ targets/
     *.asm                 Copied converted source files
     *.o, *.lis            Intermediate artefacts
     bbcbasic.bin/hex/map  Build output
-  beanzee/                BeanZee target (self-contained)
-    build.sh              Build script (9 modules, DATA at 0x8000)
-    BEANZEE.asm           BeanZee-specific primary source
-    BHOOK.asm             BeanZee-specific primary source
-    BMOS.asm              BeanZee-specific primary source
-    *.asm                 Copied converted source files
-    *.o, *.lis            Intermediate artefacts
-    bbcbasic.bin/hex/map  Build output
 ```
+
+The BeanZee target was previously built here but has been moved to the [BeanZeeOS](https://github.com/PainfulDiodes/BeanZeeOS) superproject, which combines BBC BASIC with the Marvin monitor.
 
 ## Future Work
 
-- Create a BeanDeck target configuration (ROM at 0x0000, RAM at 0x8000)
-- Implement the host interface (~15 functions for serial I/O)
+- BeanZee platform builds are now handled by [BeanZeeOS](https://github.com/PainfulDiodes/BeanZeeOS)
 
 ---
 
