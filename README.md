@@ -1,6 +1,6 @@
 # BBCZ80 for BeanZee
 
-This is a fork of [R.T.Russell's BBCZ80](https://www.bbcbasic.co.uk/bbcbasic/z80basic.html) adapted to build with z88dk's assembler (z88dk-z80asm).
+This is a fork of [R.T.Russell's BBCZ80](https://www.bbcbasic.co.uk/bbcbasic/z80basic.html) adapted to build with z88dk's assembler (z88dk-z80asm). See: [Building BBC BASIC Z80 with z88dk](./building-BBCZ80.md).
 
 It is embedded within [Marvin](https://github.com/PainfulDiodes/marvin) for use on [BeanZee](https://github.com/PainfulDiodes/BeanZee), [BeanBoard](https://github.com/PainfulDiodes/BeanBoard) and BeanDeck.
 
