@@ -1,10 +1,10 @@
 # Building BBC BASIC Z80 with z88dk
 
-This document explains the process of adapting R.T. Russell's BBC BASIC Z80 source code to build with z88dk's assembler (z88dk-z80asm) instead of the original CP/M toolchain.
+This document explains the process of adapting R.T. Russell's BBC BASIC Z80 source code to build with z88dk's assembler (z88dk-z80asm).
 
 ## Background
 
-The original source files use directives and conventions specific to the CP/M assembler toolchain. To cross-compile on Linux or macOS, we need to translate these to z88dk-compatible syntax.
+The original source files use directives and conventions specific to the CP/M assembler toolchain. To cross-compile on Linux or macOS, we will translate these to z88dk-compatible syntax.
 
 ### Original Build Process
 
@@ -162,11 +162,7 @@ targets/
     bbcbasic.bin/hex/map  Build output
 ```
 
-The BeanZee target was previously built here but has been moved to the [BeanZeeOS](https://github.com/PainfulDiodes/BeanZeeOS) superproject, which combines BBC BASIC with the Marvin monitor.
-
-## Future Work
-
-- BeanZee platform builds are now handled by [BeanZeeOS](https://github.com/PainfulDiodes/BeanZeeOS)
+A BeanZee target was previously built here but has been moved to the [Marvin](https://github.com/PainfulDiodes/marvin) project, which combines BBC BASIC with the Marvin monitor.
 
 ---
 
