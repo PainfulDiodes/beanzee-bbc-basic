@@ -1,6 +1,8 @@
 # BBCZ80 for BeanZee
 
-This is a fork of [R.T.Russell's BBCZ80](https://www.bbcbasic.co.uk/bbcbasic/z80basic.html) for use on [BeanZee](https://github.com/PainfulDiodes/BeanZee).
+This is a fork of [R.T.Russell's BBCZ80](https://www.bbcbasic.co.uk/bbcbasic/z80basic.html) adapted to build with z88dk's assembler (z88dk-z80asm).
+
+It is embedded within [Marvin](https://github.com/PainfulDiodes/marvin) for use on [BeanZee](https://github.com/PainfulDiodes/BeanZee), [BeanBoard](https://github.com/PainfulDiodes/BeanBoard) and BeanDeck.
 
 ## BBCZ80
 
@@ -12,7 +14,7 @@ EXIT statement, the address-of operator (^) and byte (unsigned 8-bit) variables 
 
 More details of the features added in version 5.00 can be found in the file WHATSNEW.TXT.
 
-![Architecture](https://www.bbcbasic.co.uk/bbcbasic/z80arch.png)
+![Architecture](./z80arch.png)
 
 The files in green constitute the generic BBC BASIC interpreter which is shared by all the
 editions, it (just!) fits in 16 Kbytes so could be held in a ROM of this size.  The files in
