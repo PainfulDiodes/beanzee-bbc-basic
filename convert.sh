@@ -117,6 +117,18 @@ if [ -f "$SRC_DIR/DATA.asm" ]; then
     mv "$temp_file" "$SRC_DIR/DATA.asm"
 fi
 
+# MAIN_SM_DSP.asm: display-friendly variant with banner strings ≤20 chars
+# for 20-column LCD devices (e.g. HD44780 20x4)
+if [ -f "$SRC_DIR/MAIN.asm" ]; then
+    echo "Creating MAIN_SM_DSP.asm (small display variant)..."
+    temp_file=$(mktemp)
+    sed \
+        -e 's/DEFM "BBC BASIC (Z80) Version 5\.00  "/DEFM "BBC BASIC (Z80) 5.00"/' \
+        -e 's/DEFM "(C) Copyright R\.T\.Russell 2025"/DEFM "(C) R.T.Russell 2025"/' \
+        "$SRC_DIR/MAIN.asm" > "$temp_file"
+    mv "$temp_file" "$SRC_DIR/MAIN_SM_DSP.asm"
+fi
+
 echo ""
 echo "Phase 2: Copying converted files to targets"
 echo "============================================"
